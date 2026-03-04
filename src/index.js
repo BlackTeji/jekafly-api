@@ -75,11 +75,22 @@ async function setupDatabase() {
   }
 }
 
+const app = express();
+
 // ─── Security middleware ──────────────────────────────────────────────────────
 app.use(helmet());
 app.use(cors({
-  origin: config.frontendUrl,
-  credentials: true,           // allow cookies
+  origin: function (origin, callback) {
+    // Allow requests with no origin (mobile apps, curl, Postman)
+    if (!origin) return callback(null, true);
+    // If FRONTEND_URL is * or not set, reflect the request origin back
+    const allowed = config.frontendUrl;
+    if (!allowed || allowed === '*') return callback(null, origin);
+    // Otherwise only allow the configured domain
+    if (origin === allowed) return callback(null, origin);
+    return callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
   methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
   allowedHeaders: ['Content-Type','Authorization'],
 }));
