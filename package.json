@@ -4,7 +4,7 @@
   "description": "Jekafly Visa Platform — Production API",
   "main": "src/index.js",
   "scripts": {
-    "start": "npx prisma migrate deploy && node prisma/seed.js && node src/index.js",
+    "start": "node node_modules/.bin/prisma migrate deploy && node prisma/seed.js && node src/index.js",
     "dev": "nodemon src/index.js",
     "db:migrate": "npx prisma migrate deploy",
     "db:generate": "npx prisma generate",
