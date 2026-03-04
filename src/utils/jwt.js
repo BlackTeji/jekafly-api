@@ -37,15 +37,15 @@ const revokeAllRefreshTokens = async (userId) => {
 const setRefreshCookie = (res, token) => {
   res.cookie('jkf_refresh', token, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days in ms
-    path: '/api/v1/auth',
+    secure: true,          
+    sameSite: 'none',      
+    maxAge: 30 * 24 * 60 * 60 * 1000,
+    path: '/',             
   });
 };
 
 const clearRefreshCookie = (res) => {
-  res.clearCookie('jkf_refresh', { path: '/api/v1/auth' });
+  res.clearCookie('jkf_refresh', { path: '/', secure: true, sameSite: 'none' });
 };
 
 module.exports = {
