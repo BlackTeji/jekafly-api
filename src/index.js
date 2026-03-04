@@ -12,14 +12,14 @@ const { errorHandler, notFound } = require('./middleware/error');
 const prisma = require('./utils/prisma');
 
 // Routes
-const authRoutes        = require('./routes/auth');
+const authRoutes = require('./routes/auth');
 const applicationRoutes = require('./routes/applications');
-const adminRoutes       = require('./routes/admin');
-const feeRoutes         = require('./routes/fees');
-const documentRoutes    = require('./routes/documents');
-const paymentRoutes     = require('./routes/payments');
-const insuranceRoutes   = require('./routes/insurance');
-const visaRoutes        = require('./routes/visa');
+const adminRoutes = require('./routes/admin');
+const feeRoutes = require('./routes/fees');
+const documentRoutes = require('./routes/documents');
+const paymentRoutes = require('./routes/payments');
+const insuranceRoutes = require('./routes/insurance');
+const visaRoutes = require('./routes/visa');
 
 const app = express();
 
@@ -41,8 +41,10 @@ async function setupDatabase() {
     const adminHash = await bcrypt.hash('admin1234', 12);
     await db.user.upsert({
       where: { email: 'admin@jekafly.com' },
-      create: { id: 'ADMIN001', name: 'Jekafly Admin', email: 'admin@jekafly.com',
-                phone: '+234 800 000 0001', passwordHash: adminHash, role: 'ADMIN' },
+      create: {
+        id: 'ADMIN001', name: 'Jekafly Admin', email: 'admin@jekafly.com',
+        phone: '+234 800 000 0001', passwordHash: adminHash, role: 'ADMIN'
+      },
       update: {},
     });
 
@@ -53,12 +55,12 @@ async function setupDatabase() {
     });
 
     const DEFAULT_FEES = {
-      'United Kingdom':185000,'United States':220000,'Canada':195000,'Australia':210000,
-      'France':160000,'Germany':160000,'UAE':95000,'Japan':175000,'China':180000,
-      'South Africa':120000,'Italy':155000,'Spain':155000,'Netherlands':155000,
-      'Portugal':155000,'Belgium':155000,'Switzerland':170000,'Sweden':160000,
-      'Norway':160000,'Denmark':160000,'Turkey':85000,'India':75000,
-      'Brazil':130000,'Saudi Arabia':90000,'Ghana':60000,'Kenya':65000,'Egypt':70000,
+      'United Kingdom': 185000, 'United States': 220000, 'Canada': 195000, 'Australia': 210000,
+      'France': 160000, 'Germany': 160000, 'UAE': 95000, 'Japan': 175000, 'China': 180000,
+      'South Africa': 120000, 'Italy': 155000, 'Spain': 155000, 'Netherlands': 155000,
+      'Portugal': 155000, 'Belgium': 155000, 'Switzerland': 170000, 'Sweden': 160000,
+      'Norway': 160000, 'Denmark': 160000, 'Turkey': 85000, 'India': 75000,
+      'Brazil': 130000, 'Saudi Arabia': 90000, 'Ghana': 60000, 'Kenya': 65000, 'Egypt': 70000,
     };
     for (const [country, amount] of Object.entries(DEFAULT_FEES)) {
       await db.fee.upsert({
@@ -71,6 +73,7 @@ async function setupDatabase() {
     console.log('Database seeded.');
   } catch (err) {
     console.error('DB setup error:', err.message);
+    console.error('DB setup stack:', err.stack);
     // Don't crash — migrations may already be applied
   }
 }
@@ -89,8 +92,8 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET','POST','PUT','PATCH','DELETE','OPTIONS'],
-  allowedHeaders: ['Content-Type','Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
 }));
 
 // ─── Paystack webhook needs raw body for signature verification ───────────────
@@ -133,13 +136,13 @@ app.get('/health', (req, res) => {
 });
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
-app.use('/api/v1/auth',         authRoutes);
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/applications', applicationRoutes);
-app.use('/api/v1/admin',        adminRoutes);
-app.use('/api/v1/fees',         feeRoutes);
-app.use('/api/v1/documents',    documentRoutes);
-app.use('/api/v1/payments',     paymentRoutes);
-app.use('/api/v1/insurance',    insuranceRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/fees', feeRoutes);
+app.use('/api/v1/documents', documentRoutes);
+app.use('/api/v1/payments', paymentRoutes);
+app.use('/api/v1/insurance', insuranceRoutes);
 app.use('/api/v1/visa-requirements', visaRoutes);
 
 // ─── Error handling ───────────────────────────────────────────────────────────
