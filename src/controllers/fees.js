@@ -12,7 +12,7 @@ exports.getAll = async (req, res, next) => {
     const destinations = {};
     fees.forEach(f => { destinations[f.country] = f.amount; });
 
-    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Cache-Control', 'no-store');
     res.json({
       ok: true,
       data: {
@@ -29,7 +29,7 @@ exports.setServiceFee = async (req, res, next) => {
   try {
     const { amount } = z.object({ amount: z.number().min(0) }).parse(req.body);
     const svc = await prisma.serviceFee.upsert({
-      where:  { id: 'singleton' },
+      where: { id: 'singleton' },
       create: { id: 'singleton', amount },
       update: { amount },
     });
@@ -43,7 +43,7 @@ exports.setDestinationFee = async (req, res, next) => {
     const { amount } = z.object({ amount: z.number().min(0) }).parse(req.body);
     const country = decodeURIComponent(req.params.country);
     const fee = await prisma.fee.upsert({
-      where:  { country },
+      where: { country },
       create: { country, amount, isDefault: false },
       update: { amount },
     });
