@@ -30,13 +30,13 @@ async function main() {
       passwordHash: adminHash,
       role: 'ADMIN',
     },
-    update: {},
+    update: { passwordHash: adminHash, role: 'ADMIN' },
   });
   console.log('✅ Admin user seeded');
 
   // Service fee
   await prisma.serviceFee.upsert({
-    where:  { id: 'singleton' },
+    where: { id: 'singleton' },
     create: { id: 'singleton', amount: 25000 },
     update: {},
   });
@@ -44,7 +44,7 @@ async function main() {
   // Default destination fees
   for (const [country, amount] of Object.entries(DEFAULT_FEES)) {
     await prisma.fee.upsert({
-      where:  { country },
+      where: { country },
       create: { country, amount, isDefault: true },
       update: {},
     });
