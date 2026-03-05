@@ -26,12 +26,12 @@ const app = express();
 // ─── Run DB migration + seed on startup ──────────────────────────────────────
 async function setupDatabase() {
   try {
-    console.log('Running database migrations...');
-    execSync('node node_modules/prisma/build/index.js migrate deploy', {
+    console.log('Pushing database schema...');
+    execSync('node node_modules/prisma/build/index.js db push --accept-data-loss', {
       stdio: 'inherit',
       env: process.env,
     });
-    console.log('Migrations complete.');
+    console.log('Schema pushed.');
 
     // Seed default data
     const { PrismaClient } = require('@prisma/client');
@@ -77,6 +77,8 @@ async function setupDatabase() {
     // Don't crash — migrations may already be applied
   }
 }
+
+app.set('trust proxy', 1); // Required for Railway/reverse proxy
 
 // ─── Security middleware ──────────────────────────────────────────────────────
 app.use(helmet());
