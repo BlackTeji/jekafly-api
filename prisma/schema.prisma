@@ -195,7 +195,7 @@ model ServiceFee {
   @@map("service_fee")
 }
 
-// ─── Visa Requirements ───────────────────────────────────────────────────────
+// ─── Visa Requirement ───────────────────────────────────────────────────────
 model VisaRequirement {
   id          String   @id @default(uuid())
   country     String   @unique
