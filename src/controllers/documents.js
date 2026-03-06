@@ -24,26 +24,26 @@ exports.upload = async (req, res, next) => {
     const docs = await Promise.all(req.files.map((file, i) =>
       prisma.document.create({
         data: {
-          userId:        req.user.id,
+          userId: req.user.id,
           applicationId,
-          name:          file.originalname,
-          key:           file.key,        // S3 key from multer-s3
-          mimeType:      file.mimetype,
-          size:          file.size,
-          docIndex:      docIndex != null ? parseInt(docIndex) + i : null,
+          name: file.originalname,
+          key: file.key,        // S3 key from multer-s3
+          mimeType: file.mimetype,
+          size: file.size,
+          docIndex: docIndex != null ? parseInt(docIndex) + i : null,
         },
       })
     ));
 
     // Build signed URLs for immediate preview
     const uploaded = await Promise.all(docs.map(async (doc) => ({
-      id:         doc.id,
-      name:       doc.name,
-      mimeType:   doc.mimeType,
-      size:       doc.size,
-      docIndex:   doc.docIndex,
+      id: doc.id,
+      name: doc.name,
+      mimeType: doc.mimeType,
+      size: doc.size,
+      docIndex: doc.docIndex,
       uploadedAt: doc.uploadedAt,
-      url:        await getSignedDownloadUrl(doc.key),
+      url: await getSignedDownloadUrl(doc.key),
     })));
 
     res.status(201).json({ ok: true, data: { uploaded } });
@@ -53,14 +53,23 @@ exports.upload = async (req, res, next) => {
 // ─── GET /documents ───────────────────────────────────────────────────────────
 exports.list = async (req, res, next) => {
   try {
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, parseInt(req.query.limit) || 50);
-    const skip  = (page - 1) * limit;
-    const where = { userId: req.user.id };
+    const skip = (page - 1) * limit;
+    const where = {};
 
     if (req.query.ref) {
       const app = await prisma.application.findUnique({ where: { ref: req.query.ref } });
-      if (app) where.applicationId = app.id;
+      if (app) {
+        // Admin can see all docs for any application; users only their own
+        if (req.user.role !== 'ADMIN' && app.userId !== req.user.id) {
+          return res.status(403).json({ ok: false, error: 'Not authorised.' });
+        }
+        where.applicationId = app.id;
+      }
+    } else {
+      // No ref — only return user's own documents
+      where.userId = req.user.id;
     }
 
     const [documents, total] = await Promise.all([
@@ -74,14 +83,14 @@ exports.list = async (req, res, next) => {
 
     // Add signed URLs
     const docsWithUrls = await Promise.all(documents.map(async (d) => ({
-      id:         d.id,
-      name:       d.name,
-      mimeType:   d.mimeType,
-      size:       d.size,
-      docIndex:   d.docIndex,
-      ref:        d.application?.ref || null,
+      id: d.id,
+      name: d.name,
+      mimeType: d.mimeType,
+      size: d.size,
+      docIndex: d.docIndex,
+      ref: d.application?.ref || null,
       uploadedAt: d.uploadedAt,
-      signedUrl:  await getSignedDownloadUrl(d.key),
+      signedUrl: await getSignedDownloadUrl(d.key),
     })));
 
     res.json({ ok: true, data: { documents: docsWithUrls, total, page, limit } });
