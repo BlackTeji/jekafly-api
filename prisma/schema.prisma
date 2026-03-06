@@ -148,6 +148,7 @@ model Payment {
 enum PaymentType {
   VISA
   INSURANCE
+  CONSULTATION
 }
 
 enum PaymentStatus {
