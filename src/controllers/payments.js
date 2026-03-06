@@ -10,11 +10,11 @@ const config = require('../config');
 exports.initiate = async (req, res, next) => {
   try {
     const schema = z.object({
-      type:        z.enum(['VISA','INSURANCE']),
-      ref:         z.string().optional(),
-      amount:      z.number().min(1),         // kobo
-      email:       z.string().email(),
-      metadata:    z.any().optional(),
+      type: z.enum(['VISA', 'INSURANCE', 'CONSULTATION']),
+      ref: z.string().optional(),
+      amount: z.number().min(1),         // kobo
+      email: z.string().email(),
+      metadata: z.any().optional(),
     });
     const { type, ref, amount, email, metadata } = schema.parse(req.body);
 
@@ -48,15 +48,17 @@ exports.initiate = async (req, res, next) => {
       amount,
       reference,
       metadata: { userId: req.user.id, ref, type, ...metadata },
-      callbackUrl: `${config.frontendUrl}/payment.html?ref=${reference}`,
+      callbackUrl: type === 'CONSULTATION'
+        ? `${config.frontendUrl}/dashboard.html?ref=${reference}`
+        : `${config.frontendUrl}/payment.html?ref=${reference}`,
     });
 
     res.json({
       ok: true,
       data: {
         authorizationUrl: paystackData.authorization_url,
-        accessCode:       paystackData.access_code,
-        reference:        paystackData.reference,
+        accessCode: paystackData.access_code,
+        reference: paystackData.reference,
       }
     });
   } catch (err) { next(err); }
@@ -126,7 +128,7 @@ async function handleChargeSuccess(data) {
       where: { id: payment.userId },
       select: { name: true, email: true },
     });
-    if (user) await emails.paymentConfirmed(app, payment, user).catch(() => {});
+    if (user) await emails.paymentConfirmed(app, payment, user).catch(() => { });
   }
 
   // If this is an insurance payment — create policy
@@ -134,14 +136,14 @@ async function handleChargeSuccess(data) {
     const meta = payment.metadata || {};
     const policy = await prisma.insurancePolicy.create({
       data: {
-        userId:      payment.userId,
-        paymentRef:  reference,
-        plan:        meta.plan || 'Standard',
+        userId: payment.userId,
+        paymentRef: reference,
+        plan: meta.plan || 'Standard',
         destination: meta.destination,
-        travelDate:  meta.date ? new Date(meta.date) : null,
-        travellers:  parseInt(meta.travellers) || 1,
-        amount:      amount / 100,  // store in naira
-        status:      'active',
+        travelDate: meta.date ? new Date(meta.date) : null,
+        travellers: parseInt(meta.travellers) || 1,
+        amount: amount / 100,  // store in naira
+        status: 'active',
       }
     });
 
@@ -149,7 +151,7 @@ async function handleChargeSuccess(data) {
       where: { id: payment.userId },
       select: { name: true, email: true },
     });
-    if (user) await emails.insurancePolicy(policy, user).catch(() => {});
+    if (user) await emails.insurancePolicy(policy, user).catch(() => { });
   }
 }
 
@@ -178,14 +180,14 @@ exports.verify = async (req, res, next) => {
     res.json({
       ok: true,
       data: {
-        status:    verified.status,
-        amount:    verified.amount / 100,  // naira
+        status: verified.status,
+        amount: verified.amount / 100,  // naira
         reference,
-        ref:       appRef,
+        ref: appRef,
         receipt: {
-          txRef:    reference,
-          amount:   verified.amount / 100,
-          paidAt:   payment.paidAt || new Date(),
+          txRef: reference,
+          amount: verified.amount / 100,
+          paidAt: payment.paidAt || new Date(),
           metadata: payment.metadata,
         }
       }
@@ -207,12 +209,14 @@ exports.list = async (req, res, next) => {
       data: {
         payments: payments.map(p => ({
           reference: p.reference,
-          type:      p.type.toLowerCase(),
-          amount:    p.amount / 100,
-          status:    p.status.toLowerCase(),
-          paidAt:    p.paidAt,
-          ref:       p.application?.ref || null,
+          type: p.type,
+          amount: p.amount / 100,
+          status: p.status,
+          paidAt: p.paidAt,
+          createdAt: p.initiatedAt,
+          ref: p.application?.ref || null,
           destination: p.application?.destination || null,
+          metadata: p.metadata || {},
         }))
       }
     });
