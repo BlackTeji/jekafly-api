@@ -21,8 +21,6 @@ const paymentRoutes = require('./routes/payments');
 const insuranceRoutes = require('./routes/insurance');
 const visaRoutes = require('./routes/visa');
 
-const app = express();
-
 // ─── Run DB migration + seed on startup ──────────────────────────────────────
 async function setupDatabase() {
   try {
@@ -91,7 +89,6 @@ async function setupDatabase() {
   }
 }
 
-const app = express();
 app.set('trust proxy', 1); // Required for Railway/reverse proxy
 
 // ─── Security middleware ──────────────────────────────────────────────────────
