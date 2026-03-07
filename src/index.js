@@ -21,6 +21,8 @@ const paymentRoutes = require('./routes/payments');
 const insuranceRoutes = require('./routes/insurance');
 const visaRoutes = require('./routes/visa');
 
+const app = express();
+
 // ─── Run DB migration + seed on startup ──────────────────────────────────────
 async function setupDatabase() {
   try {
