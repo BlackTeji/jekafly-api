@@ -104,6 +104,10 @@ async function start() {
       await db.$executeRawUnsafe(`
         ALTER TABLE fees ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true;
       `);
+      // Add passportIssueDate column to applications table if missing
+      await db.$executeRawUnsafe(`
+        ALTER TABLE applications ADD COLUMN IF NOT EXISTS "passportIssueDate" TIMESTAMP;
+      `);
       console.log('Enum patched.');
     } catch (e) {
       console.error('Enum patch (non-fatal):', e.message);
