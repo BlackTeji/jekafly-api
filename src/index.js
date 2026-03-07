@@ -26,12 +26,25 @@ const app = express();
 // ─── Run DB migration + seed on startup ──────────────────────────────────────
 async function setupDatabase() {
   try {
+    // Ensure CONSULTATION enum value exists in DB (safe to run repeatedly)
+    const { Client } = require('pg');
+    const pgClient = new Client({ connectionString: process.env.DATABASE_URL });
+    await pgClient.connect();
+    await pgClient.query(`
+      DO $$ BEGIN
+        ALTER TYPE "PaymentType" ADD VALUE IF NOT EXISTS 'CONSULTATION';
+      EXCEPTION WHEN duplicate_object THEN NULL;
+      END $$;
+    `);
+    await pgClient.end();
+
     console.log('Pushing database schema...');
     execSync('node node_modules/prisma/build/index.js db push --accept-data-loss', {
       stdio: 'inherit',
       env: process.env,
     });
     console.log('Schema pushed.');
+
 
     // Seed default data
     const { PrismaClient } = require('@prisma/client');
@@ -78,6 +91,7 @@ async function setupDatabase() {
   }
 }
 
+const app = express();
 app.set('trust proxy', 1); // Required for Railway/reverse proxy
 
 // ─── Security middleware ──────────────────────────────────────────────────────
