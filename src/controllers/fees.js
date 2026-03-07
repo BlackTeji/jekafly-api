@@ -10,7 +10,11 @@ exports.getAll = async (req, res, next) => {
     ]);
 
     const destinations = {};
-    fees.forEach(f => { destinations[f.country] = f.amount; });
+    const enabledCountries = [];
+    fees.forEach(f => {
+      destinations[f.country] = f.amount;
+      if (f.enabled) enabledCountries.push(f.country);
+    });
 
     res.set('Cache-Control', 'no-store');
     res.json({
@@ -18,13 +22,13 @@ exports.getAll = async (req, res, next) => {
       data: {
         serviceFee: svcRow?.amount ?? 25000,
         destinations,
+        enabledCountries, // list of countries open for visa processing
       }
     });
   } catch (err) { next(err); }
 };
 
-// ─── PUT /admin/fees/service ──────────────────────────────────────────────────
-// Note: routed via /fees/service from fees router, admin-guarded in router
+// ─── PUT /fees/service ────────────────────────────────────────────────────────
 exports.setServiceFee = async (req, res, next) => {
   try {
     const { amount } = z.object({ amount: z.number().min(0) }).parse(req.body);
@@ -44,10 +48,26 @@ exports.setDestinationFee = async (req, res, next) => {
     const country = decodeURIComponent(req.params.country);
     const fee = await prisma.fee.upsert({
       where: { country },
-      create: { country, amount, isDefault: false },
+      create: { country, amount, isDefault: false, enabled: true },
       update: { amount },
     });
     res.json({ ok: true, data: { country: fee.country, amount: fee.amount } });
+  } catch (err) { next(err); }
+};
+
+// ─── PATCH /fees/:country/toggle ──────────────────────────────────────────────
+exports.toggleCountry = async (req, res, next) => {
+  try {
+    const country = decodeURIComponent(req.params.country);
+    // Get current state (upsert to ensure row exists)
+    const existing = await prisma.fee.findUnique({ where: { country } });
+    const currentEnabled = existing?.enabled ?? true;
+    const fee = await prisma.fee.upsert({
+      where: { country },
+      create: { country, amount: 0, isDefault: false, enabled: !currentEnabled },
+      update: { enabled: !currentEnabled },
+    });
+    res.json({ ok: true, data: { country: fee.country, enabled: fee.enabled } });
   } catch (err) { next(err); }
 };
 

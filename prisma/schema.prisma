@@ -182,6 +182,7 @@ model Fee {
   country     String   @unique
   amount      Int      // naira
   isDefault   Boolean  @default(false)
+  enabled     Boolean  @default(true)
   updatedAt   DateTime @updatedAt
 
   @@map("fees")
@@ -195,7 +196,7 @@ model ServiceFee {
   @@map("service_fee")
 }
 
-// ─── Visa Requirement ───────────────────────────────────────────────────────
+// ─── Visa Requirements ───────────────────────────────────────────────────────
 model VisaRequirement {
   id          String   @id @default(uuid())
   country     String   @unique
