@@ -65,6 +65,7 @@ model Application {
   nationality     String?
   passportNumber  String?
   passportExpiry  DateTime?
+  passportIssueDate DateTime?
   dob             DateTime?
 
   // Status & payment
