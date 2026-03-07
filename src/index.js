@@ -100,6 +100,10 @@ async function start() {
         EXCEPTION WHEN duplicate_object THEN NULL;
         END $$;
       `);
+      // Add enabled column to fees table if missing
+      await db.$executeRawUnsafe(`
+        ALTER TABLE fees ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true;
+      `);
       console.log('Enum patched.');
     } catch (e) {
       console.error('Enum patch (non-fatal):', e.message);
