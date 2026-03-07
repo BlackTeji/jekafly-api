@@ -42,6 +42,11 @@ exports.initiate = async (req, res, next) => {
       }
     });
 
+    // Guard: Paystack not configured
+    if (!config.paystack.secretKey) {
+      throw new ApiError('Payment processing is not yet configured. Please contact support.', 503);
+    }
+
     // Call Paystack
     const paystackData = await paystack.initializeTransaction({
       email,
