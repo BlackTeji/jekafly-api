@@ -1,43 +1,121 @@
 require('dotenv').config();
-const express = require('express');
-const helmet = require('helmet');
-const cors = require('cors');
-const cookieParser = require('cookie-parser');
-const morgan = require('morgan');
-const { rateLimit } = require('express-rate-limit');
 const { execSync } = require('child_process');
+const { Client } = require('pg');
 
-const config = require('./config');
-const { errorHandler, notFound } = require('./middleware/error');
-const prisma = require('./utils/prisma');
-
-// Routes
-const authRoutes = require('./routes/auth');
-const applicationRoutes = require('./routes/applications');
-const adminRoutes = require('./routes/admin');
-const feeRoutes = require('./routes/fees');
-const documentRoutes = require('./routes/documents');
-const paymentRoutes = require('./routes/payments');
-const insuranceRoutes = require('./routes/insurance');
-const visaRoutes = require('./routes/visa');
-
-const app = express();
-
-// ─── Run DB migration + seed on startup ──────────────────────────────────────
-async function setupDatabase() {
+// ─── Step 1: Patch DB enum via raw SQL BEFORE Prisma client loads ─────────────
+async function patchEnum() {
   try {
-    // Ensure CONSULTATION enum value exists in DB (safe to run repeatedly)
-    const { Client } = require('pg');
-    const pgClient = new Client({ connectionString: process.env.DATABASE_URL });
-    await pgClient.connect();
-    await pgClient.query(`
+    const pg = new Client({ connectionString: process.env.DATABASE_URL });
+    await pg.connect();
+    await pg.query(`
       DO $$ BEGIN
         ALTER TYPE "PaymentType" ADD VALUE IF NOT EXISTS 'CONSULTATION';
       EXCEPTION WHEN duplicate_object THEN NULL;
       END $$;
     `);
-    await pgClient.end();
+    await pg.end();
+    console.log('Enum patched.');
+  } catch (e) {
+    console.error('Enum patch error (non-fatal):', e.message);
+  }
+}
 
+// ─── Step 2: Regenerate Prisma client so it picks up the new enum ─────────────
+function regeneratePrisma() {
+  try {
+    execSync('node node_modules/prisma/build/index.js generate', {
+      stdio: 'inherit',
+      env: process.env,
+    });
+  } catch (e) {
+    console.error('Prisma generate error (non-fatal):', e.message);
+  }
+}
+
+(async () => {
+  await patchEnum();
+  regeneratePrisma();
+
+  // ─── Now safe to require Prisma-dependent modules ─────────────────────────
+  const express = require('express');
+  const helmet = require('helmet');
+  const cors = require('cors');
+  const cookieParser = require('cookie-parser');
+  const morgan = require('morgan');
+  const { rateLimit } = require('express-rate-limit');
+
+  const config = require('./config');
+  const { errorHandler, notFound } = require('./middleware/error');
+
+  const authRoutes = require('./routes/auth');
+  const applicationRoutes = require('./routes/applications');
+  const adminRoutes = require('./routes/admin');
+  const feeRoutes = require('./routes/fees');
+  const documentRoutes = require('./routes/documents');
+  const paymentRoutes = require('./routes/payments');
+  const insuranceRoutes = require('./routes/insurance');
+  const visaRoutes = require('./routes/visa');
+
+  const app = express();
+  app.set('trust proxy', 1);
+
+  app.use(helmet());
+  app.use(cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      const allowed = config.frontendUrl;
+      if (!allowed || allowed === '*') return callback(null, origin);
+      if (origin === allowed) return callback(null, origin);
+      return callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
+
+  app.use('/api/v1/payments/webhook', express.raw({ type: 'application/json' }));
+  app.use(express.json({ limit: '10mb' }));
+  app.use(express.urlencoded({ extended: true }));
+  app.use(cookieParser());
+
+  if (config.nodeEnv !== 'test') app.use(morgan('combined'));
+
+  app.use('/api/', rateLimit({
+    windowMs: 60 * 1000,
+    max: 100,
+    message: { ok: false, error: 'Too many requests. Please try again later.' },
+    standardHeaders: true,
+    legacyHeaders: false,
+  }));
+  app.use('/api/v1/auth/login', rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 5,
+    message: { ok: false, error: 'Too many login attempts. Please wait 15 minutes.' },
+  }));
+  app.use('/api/v1/auth/register', rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 10,
+    message: { ok: false, error: 'Too many registration attempts.' },
+  }));
+
+  app.get('/health', (req, res) => {
+    res.json({ ok: true, service: 'jekafly-api', timestamp: new Date().toISOString() });
+  });
+
+  app.use('/api/v1/auth', authRoutes);
+  app.use('/api/v1/applications', applicationRoutes);
+  app.use('/api/v1/admin', adminRoutes);
+  app.use('/api/v1/fees', feeRoutes);
+  app.use('/api/v1/documents', documentRoutes);
+  app.use('/api/v1/payments', paymentRoutes);
+  app.use('/api/v1/insurance', insuranceRoutes);
+  app.use('/api/v1/visa-requirements', visaRoutes);
+
+  app.use(notFound);
+  app.use(errorHandler);
+
+  // ─── DB push + seed ───────────────────────────────────────────────────────
+  try {
     console.log('Pushing database schema...');
     execSync('node node_modules/prisma/build/index.js db push --accept-data-loss', {
       stdio: 'inherit',
@@ -45,8 +123,6 @@ async function setupDatabase() {
     });
     console.log('Schema pushed.');
 
-
-    // Seed default data
     const { PrismaClient } = require('@prisma/client');
     const bcrypt = require('bcryptjs');
     const db = new PrismaClient();
@@ -58,7 +134,7 @@ async function setupDatabase() {
         id: 'ADMIN001', name: 'Jekafly Admin', email: 'admin@jekafly.com',
         phone: '+234 800 000 0001', passwordHash: adminHash, role: 'ADMIN'
       },
-      update: {},
+      update: { passwordHash: adminHash, role: 'ADMIN' },
     });
 
     await db.serviceFee.upsert({
@@ -87,92 +163,12 @@ async function setupDatabase() {
   } catch (err) {
     console.error('DB setup error:', err.message);
     console.error('DB setup stack:', err.stack);
-    // Don't crash — migrations may already be applied
   }
-}
 
-app.set('trust proxy', 1); // Required for Railway/reverse proxy
-
-// ─── Security middleware ──────────────────────────────────────────────────────
-app.use(helmet());
-app.use(cors({
-  origin: function (origin, callback) {
-    // Allow requests with no origin (mobile apps, curl, Postman)
-    if (!origin) return callback(null, true);
-    // If FRONTEND_URL is * or not set, reflect the request origin back
-    const allowed = config.frontendUrl;
-    if (!allowed || allowed === '*') return callback(null, origin);
-    // Otherwise only allow the configured domain
-    if (origin === allowed) return callback(null, origin);
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-}));
-
-// ─── Paystack webhook needs raw body for signature verification ───────────────
-app.use('/api/v1/payments/webhook', express.raw({ type: 'application/json' }));
-
-// ─── Standard body parsing ────────────────────────────────────────────────────
-app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true }));
-app.use(cookieParser());
-
-// ─── Logging ─────────────────────────────────────────────────────────────────
-if (config.nodeEnv !== 'test') {
-  app.use(morgan('combined'));
-}
-
-// ─── Global rate limiting ─────────────────────────────────────────────────────
-app.use('/api/', rateLimit({
-  windowMs: 60 * 1000,     // 1 minute
-  max: 100,
-  message: { ok: false, error: 'Too many requests. Please try again later.' },
-  standardHeaders: true,
-  legacyHeaders: false,
-}));
-
-// ─── Auth endpoints get stricter rate limiting ────────────────────────────────
-app.use('/api/v1/auth/login', rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5,
-  message: { ok: false, error: 'Too many login attempts. Please wait 15 minutes.' },
-}));
-app.use('/api/v1/auth/register', rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 10,
-  message: { ok: false, error: 'Too many registration attempts.' },
-}));
-
-// ─── Health check ─────────────────────────────────────────────────────────────
-app.get('/health', (req, res) => {
-  res.json({ ok: true, service: 'jekafly-api', timestamp: new Date().toISOString() });
-});
-
-// ─── API Routes ───────────────────────────────────────────────────────────────
-app.use('/api/v1/auth', authRoutes);
-app.use('/api/v1/applications', applicationRoutes);
-app.use('/api/v1/admin', adminRoutes);
-app.use('/api/v1/fees', feeRoutes);
-app.use('/api/v1/documents', documentRoutes);
-app.use('/api/v1/payments', paymentRoutes);
-app.use('/api/v1/insurance', insuranceRoutes);
-app.use('/api/v1/visa-requirements', visaRoutes);
-
-// ─── Error handling ───────────────────────────────────────────────────────────
-app.use(notFound);
-app.use(errorHandler);
-
-// ─── Start ────────────────────────────────────────────────────────────────────
-const PORT = config.port;
-
-setupDatabase().then(() => {
+  const PORT = config.port;
   app.listen(PORT, () => {
     console.log(`\n🚀  Jekafly API running on port ${PORT}`);
     console.log(`   Environment: ${config.nodeEnv}`);
     console.log(`   Health:      http://localhost:${PORT}/health\n`);
   });
-});
-
-module.exports = app;
+})();
