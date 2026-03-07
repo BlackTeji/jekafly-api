@@ -12,14 +12,20 @@ const paystackApi = axios.create({
 
 // Initiate a Paystack transaction
 const initializeTransaction = async ({ email, amount, reference, metadata, callbackUrl }) => {
-  const { data } = await paystackApi.post('/transaction/initialize', {
-    email,
-    amount,          // in kobo
-    reference,
-    metadata,
-    callback_url: callbackUrl || `${config.frontendUrl}/payment.html`,
-  });
-  return data.data; // { authorization_url, access_code, reference }
+  try {
+    const { data } = await paystackApi.post('/transaction/initialize', {
+      email,
+      amount,
+      reference,
+      metadata,
+      callback_url: callbackUrl || `${config.frontendUrl}/payment.html`,
+    });
+    return data.data;
+  } catch (err) {
+    const status = err.response?.status;
+    if (status === 401) throw new Error('Paystack secret key is invalid or not configured.');
+    throw new Error(err.response?.data?.message || err.message || 'Paystack error');
+  }
 };
 
 // Verify a transaction server-side
