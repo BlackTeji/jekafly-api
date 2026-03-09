@@ -197,6 +197,21 @@ model ServiceFee {
   @@map("service_fee")
 }
 
+model PricingConfig {
+  id                    String   @id @default("singleton")
+  // Consultation packages (naira)
+  consultStandard       Int      @default(15000)
+  consultPriority       Int      @default(25000)
+  consultVip            Int      @default(50000)
+  // Insurance plans (naira, per person)
+  insuranceBasic        Int      @default(25000)
+  insuranceStandard     Int      @default(45000)
+  insurancePremium      Int      @default(80000)
+  updatedAt             DateTime @updatedAt
+
+  @@map("pricing_config")
+}
+
 // ─── Visa Requirements ───────────────────────────────────────────────────────
 model VisaRequirement {
   id          String   @id @default(uuid())

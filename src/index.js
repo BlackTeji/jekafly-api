@@ -28,7 +28,7 @@ const feeRoutes = require('./routes/fees');
 const documentRoutes = require('./routes/documents');
 const paymentRoutes = require('./routes/payments');
 const insuranceRoutes = require('./routes/insurance');
-const visaRoutes = require('./routes/visa');
+const pricingRoutes = require('./routes/pricing');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -80,6 +80,7 @@ app.use('/api/v1/documents', documentRoutes);
 app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/insurance', insuranceRoutes);
 app.use('/api/v1/visa-requirements', visaRoutes);
+app.use('/api/v1/pricing', pricingRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -107,6 +108,12 @@ async function start() {
       // Add passportIssueDate column to applications table if missing
       await db.$executeRawUnsafe(`
         ALTER TABLE applications ADD COLUMN IF NOT EXISTS "passportIssueDate" TIMESTAMP;
+      `);
+      // Ensure pricing_config singleton row exists
+      await db.$executeRawUnsafe(`
+        INSERT INTO pricing_config (id, "consultStandard", "consultPriority", "consultVip", "insuranceBasic", "insuranceStandard", "insurancePremium", "updatedAt")
+        VALUES ('singleton', 15000, 25000, 50000, 25000, 45000, 80000, NOW())
+        ON CONFLICT (id) DO NOTHING;
       `);
       console.log('Enum patched.');
     } catch (e) {
