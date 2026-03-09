@@ -28,6 +28,7 @@ const feeRoutes = require('./routes/fees');
 const documentRoutes = require('./routes/documents');
 const paymentRoutes = require('./routes/payments');
 const insuranceRoutes = require('./routes/insurance');
+const visaRoutes = require('./routes/visa');
 const pricingRoutes = require('./routes/pricing');
 
 const app = express();
