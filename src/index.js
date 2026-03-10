@@ -61,12 +61,14 @@ app.use('/api/', rateLimit({
   standardHeaders: true, legacyHeaders: false,
 }));
 app.use('/api/v1/auth/login', rateLimit({
-  windowMs: 15 * 60 * 1000, max: 5,
-  message: { ok: false, error: 'Too many login attempts. Please wait 15 minutes.' },
+  windowMs: 15 * 60 * 1000, max: 20,
+  message: { ok: false, error: 'Too many login attempts. Please wait 15 minutes and try again.' },
+  standardHeaders: true, legacyHeaders: false,
 }));
 app.use('/api/v1/auth/register', rateLimit({
-  windowMs: 60 * 60 * 1000, max: 10,
-  message: { ok: false, error: 'Too many registration attempts.' },
+  windowMs: 60 * 60 * 1000, max: 20,
+  message: { ok: false, error: 'Too many registration attempts. Please try again later.' },
+  standardHeaders: true, legacyHeaders: false,
 }));
 
 app.get('/health', (req, res) => {
