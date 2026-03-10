@@ -2,7 +2,8 @@ const axios = require('axios');
 const crypto = require('crypto');
 const config = require('../config');
 
-const paystackApi = axios.create({
+// Create a fresh axios instance per request so the secret key is always current
+const paystackApi = () => axios.create({
   baseURL: config.paystack.baseUrl,
   headers: {
     Authorization: `Bearer ${config.paystack.secretKey}`,
@@ -13,7 +14,7 @@ const paystackApi = axios.create({
 // Initiate a Paystack transaction
 const initializeTransaction = async ({ email, amount, reference, metadata, callbackUrl }) => {
   try {
-    const { data } = await paystackApi.post('/transaction/initialize', {
+    const { data } = await paystackApi().post('/transaction/initialize', {
       email,
       amount,
       reference,
@@ -30,7 +31,7 @@ const initializeTransaction = async ({ email, amount, reference, metadata, callb
 
 // Verify a transaction server-side
 const verifyTransaction = async (reference) => {
-  const { data } = await paystackApi.get(`/transaction/verify/${reference}`);
+  const { data } = await paystackApi().get(`/transaction/verify/${reference}`);
   return data.data; // { status, amount, reference, customer, metadata }
 };
 
