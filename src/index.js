@@ -37,10 +37,18 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true);
-    const allowed = config.frontendUrl;
-    if (!allowed || allowed === '*') return callback(null, origin);
-    if (origin === allowed) return callback(null, origin);
+    if (!origin) return callback(null, true); // allow server-to-server / curl
+    const primary = config.frontendUrl;
+    const allowed = [
+      primary,
+      'http://localhost:5500',
+      'http://localhost:5506',
+      'http://127.0.0.1:5500',
+      'http://127.0.0.1:5506',
+    ].filter(Boolean);
+    // Also allow any vercel.app preview deployments for this project
+    const isVercelPreview = /^https:\/\/jekafly-frontend[a-z0-9-]*\.vercel\.app$/.test(origin);
+    if (allowed.includes(origin) || isVercelPreview) return callback(null, origin);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
