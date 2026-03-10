@@ -14,6 +14,8 @@ const paystackApi = () => axios.create({
 // Initiate a Paystack transaction
 const initializeTransaction = async ({ email, amount, reference, metadata, callbackUrl }) => {
   try {
+    console.log('[Paystack] callback_url:', callbackUrl);
+    console.log('[Paystack] FRONTEND_URL:', config.frontendUrl);
     const { data } = await paystackApi().post('/transaction/initialize', {
       email,
       amount,
@@ -21,6 +23,7 @@ const initializeTransaction = async ({ email, amount, reference, metadata, callb
       metadata,
       callback_url: callbackUrl || `${config.frontendUrl}/payment.html`,
     });
+    console.log('[Paystack] authorization_url:', data.data?.authorization_url);
     return data.data;
   } catch (err) {
     const status = err.response?.status;
