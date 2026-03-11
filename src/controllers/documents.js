@@ -81,8 +81,8 @@ exports.list = async (req, res, next) => {
       prisma.document.count({ where }),
     ]);
 
-    // Add signed URLs
-    const docsWithUrls = await Promise.all(documents.map(async (d) => ({
+    // Return docs without pre-generating signed URLs (generated on demand via /documents/:id/url)
+    const docsWithUrls = documents.map((d) => ({
       id: d.id,
       name: d.name,
       mimeType: d.mimeType,
@@ -90,8 +90,7 @@ exports.list = async (req, res, next) => {
       docIndex: d.docIndex,
       ref: d.application?.ref || null,
       uploadedAt: d.uploadedAt,
-      signedUrl: await getSignedDownloadUrl(d.key),
-    })));
+    }));
 
     res.json({ ok: true, data: { documents: docsWithUrls, total, page, limit } });
   } catch (err) { next(err); }
