@@ -6,9 +6,9 @@ const { emails } = require('../services/email');
 // ─── GET /admin/applications ──────────────────────────────────────────────────
 exports.listApplications = async (req, res, next) => {
   try {
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, parseInt(req.query.limit) || 50);
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     const where = {};
 
     if (req.query.status) {
@@ -17,10 +17,10 @@ exports.listApplications = async (req, res, next) => {
     if (req.query.q) {
       const q = req.query.q.toLowerCase();
       where.OR = [
-        { ref:           { contains: q, mode: 'insensitive' } },
+        { ref: { contains: q, mode: 'insensitive' } },
         { applicantName: { contains: q, mode: 'insensitive' } },
-        { email:         { contains: q, mode: 'insensitive' } },
-        { destination:   { contains: q, mode: 'insensitive' } },
+        { email: { contains: q, mode: 'insensitive' } },
+        { destination: { contains: q, mode: 'insensitive' } },
       ];
     }
 
@@ -38,10 +38,10 @@ exports.listApplications = async (req, res, next) => {
       select: { status: true, paid: true, fee: true },
     });
     const stats = {
-      total:    all.length,
-      pending:  all.filter(a => ['RECEIVED','PROCESSING','EMBASSY'].includes(a.status)).length,
-      approved: all.filter(a => ['APPROVED','DELIVERED'].includes(a.status)).length,
-      revenue:  all.filter(a => a.paid).reduce((s, a) => s + a.fee, 0) / 100,
+      total: all.length,
+      pending: all.filter(a => ['RECEIVED', 'PROCESSING', 'EMBASSY'].includes(a.status)).length,
+      approved: all.filter(a => ['APPROVED', 'DELIVERED'].includes(a.status)).length,
+      revenue: all.filter(a => a.paid).reduce((s, a) => s + a.fee, 0) / 100,
     };
 
     res.json({ ok: true, data: { applications: applications.map(fmt), total, page, limit, stats } });
@@ -52,8 +52,8 @@ exports.listApplications = async (req, res, next) => {
 exports.updateStatus = async (req, res, next) => {
   try {
     const schema = z.object({
-      status: z.enum(['RECEIVED','PROCESSING','EMBASSY','APPROVED','DELIVERED','REJECTED']),
-      note:   z.string().min(1),
+      status: z.enum(['RECEIVED', 'PROCESSING', 'EMBASSY', 'APPROVED', 'DELIVERED', 'REJECTED']),
+      note: z.string().min(1),
     });
     const { status, note } = schema.parse(req.body);
 
@@ -65,7 +65,7 @@ exports.updateStatus = async (req, res, next) => {
       data: {
         status,
         // Auto-mark as paid when approved or delivered
-        ...((['APPROVED','DELIVERED'].includes(status)) && { paid: true }),
+        ...((['APPROVED', 'DELIVERED'].includes(status)) && { paid: true }),
         statusHistory: { create: { status, note } },
       },
       include: { statusHistory: { orderBy: { createdAt: 'asc' } } },
@@ -76,7 +76,7 @@ exports.updateStatus = async (req, res, next) => {
       where: { id: app.userId },
       select: { name: true, email: true },
     });
-    if (user) await emails.statusUpdated(updated, note, user).catch(() => {});
+    if (user) await emails.statusUpdated(updated, note, user).catch(() => { });
 
     res.json({ ok: true, data: { application: fmt(updated) } });
   } catch (err) { next(err); }
@@ -85,17 +85,19 @@ exports.updateStatus = async (req, res, next) => {
 // ─── GET /admin/users ─────────────────────────────────────────────────────────
 exports.listUsers = async (req, res, next) => {
   try {
-    const page  = Math.max(1, parseInt(req.query.page)  || 1);
+    const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, parseInt(req.query.limit) || 50);
-    const skip  = (page - 1) * limit;
+    const skip = (page - 1) * limit;
     const where = req.query.role ? { role: req.query.role.toUpperCase() } : {};
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
         where, skip, take: limit,
         orderBy: { createdAt: 'desc' },
-        select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true,
-                  _count: { select: { applications: true } } },
+        select: {
+          id: true, name: true, email: true, phone: true, role: true, createdAt: true,
+          _count: { select: { applications: true } }
+        },
       }),
       prisma.user.count({ where }),
     ]);
@@ -113,7 +115,7 @@ exports.listUsers = async (req, res, next) => {
 // ─── PATCH /admin/users/:id/role ──────────────────────────────────────────────
 exports.updateRole = async (req, res, next) => {
   try {
-    const { role } = z.object({ role: z.enum(['USER','ADMIN']) }).parse(req.body);
+    const { role } = z.object({ role: z.enum(['USER', 'ADMIN']) }).parse(req.body);
     const user = await prisma.user.update({
       where: { id: req.params.id },
       data: { role },
@@ -131,3 +133,39 @@ const fmt = (app) => ({
     status: h.status.toLowerCase(), note: h.note, date: h.createdAt,
   })),
 });
+
+// ─── GET /admin/documents ─────────────────────────────────────────────────────
+exports.listDocuments = async (req, res, next) => {
+  try {
+    const ref = req.query.ref;
+    const userId = req.query.userId;
+    const where = {};
+    if (ref) {
+      const app = await require('../utils/prisma').application.findUnique({ where: { ref } });
+      if (app) where.applicationId = app.id;
+    }
+    if (userId) where.userId = userId;
+
+    const prisma = require('../utils/prisma');
+    const docs = await prisma.document.findMany({
+      where,
+      orderBy: { uploadedAt: 'desc' },
+      include: {
+        user: { select: { name: true, email: true } },
+        application: { select: { ref: true } },
+      },
+    });
+
+    const docsWithUrls = docs.map((d) => ({
+      id: d.id,
+      name: d.name,
+      mimeType: d.mimeType,
+      size: d.size,
+      ref: d.application?.ref || null,
+      uploadedBy: d.user?.name || d.user?.email || 'Unknown',
+      uploadedAt: d.uploadedAt,
+    }));
+
+    res.json({ ok: true, data: { documents: docsWithUrls } });
+  } catch (err) { next(err); }
+};
