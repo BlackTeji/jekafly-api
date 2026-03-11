@@ -33,8 +33,8 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
 const LOGO_URL = 'https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png';
-const BRAND = '#ff1414';
-const DARK = '#0a1f44';
+const BRAND = '#f80909';
+const DARK = '#213b68';
 
 const layout = (content) => `
 <!DOCTYPE html>
@@ -51,7 +51,7 @@ const layout = (content) => `
             <p style="margin:10px 0 0;color:#a0b4cc;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Your Journey Simplified</p>
           </td>
         </tr>
-        <!-- Orange accent bar -->
+        <!-- Red accent bar -->
         <tr>
           <td style="background:${BRAND};height:4px;line-height:4px;font-size:0;">&nbsp;</td>
         </tr>
@@ -107,20 +107,20 @@ const emails = {
 
   applicationConfirmed: async (app, user) => sendEmail({
     to: user.email,
-    subject: `✅ Application Received — ${app.ref}`,
+    subject: `📋 Application Received — ${app.ref}`,
     html: layout(`
-      <h2 style="color:#0a1f44;margin:0 0 8px;">Application Received ✅</h2>
+      <h2 style="color:${DARK};margin:0 0 8px;">Application Received 📋</h2>
       <p style="color:#555;line-height:1.6;">Hi ${user.name.split(' ')[0]}, we've received your visa application. Here's a summary:</p>
       ${infoTable(`
         ${infoRow('Reference', app.ref)}
         ${infoRow('Destination', app.destination)}
         ${infoRow('Visa Type', app.visaType || 'Standard')}
         ${infoRow('Travel Date', app.travelDate ? new Date(app.travelDate).toDateString() : '—')}
-        ${infoRow('Status', '⏳ Pending Payment')}
+        ${infoRow('Travellers', app.travellers || 1)}
       `)}
-      <p style="color:#555;line-height:1.6;"><strong>Next step:</strong> Complete your payment to begin processing.</p>
+      <p style="color:#555;line-height:1.6;">Our team will process your application and keep you updated at every step. You'll receive a confirmation once your payment is verified.</p>
       <div style="text-align:center;margin:28px 0;">
-        ${btn('Complete Payment →', `${config.frontendUrl}/payment.html`)}
+        ${btn('View My Application →', `${config.frontendUrl}/dashboard.html`)}
       </div>
     `),
   }),
@@ -129,16 +129,21 @@ const emails = {
     to: user.email,
     subject: `💳 Payment Confirmed — ${app?.ref || payment.reference}`,
     html: layout(`
-      <h2 style="color:#0a1f44;margin:0 0 8px;">Payment Confirmed 💳</h2>
-      <p style="color:#555;line-height:1.6;">Hi ${user.name.split(' ')[0]}, your payment has been received and your application is now being processed.</p>
+      <h2 style="color:${DARK};margin:0 0 8px;">Payment Confirmed 💳</h2>
+      <p style="color:#555;line-height:1.6;">Hi ${user.name.split(' ')[0]}, your payment has been received and your application is now <strong>under active review</strong>.</p>
       ${infoTable(`
         ${infoRow('Application Ref', app?.ref || '—')}
+        ${infoRow('Destination', app?.destination || '—')}
+        ${infoRow('Visa Type', app?.visaType || 'Standard')}
         ${infoRow('Transaction ID', payment.reference)}
         ${infoRow('Amount Paid', `₦${((payment.amount || 0) / 100).toLocaleString()}`)}
         ${infoRow('Date', new Date().toDateString())}
-        ${infoRow('Status', '✅ Confirmed')}
+        ${infoRow('Status', '<span style="color:#16a34a;font-weight:700;">✅ Processing</span>')}
       `)}
-      <p style="color:#555;line-height:1.6;">Expected processing time is <strong>3–5 business days</strong>.</p>
+      <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:14px 18px;border-radius:0 8px 8px 0;margin:16px 0;color:#444;font-size:14px;line-height:1.6;">
+        🎯 <strong>What happens next?</strong><br>
+        Our visa experts will review your documents and submit your application. Expected processing time is <strong>3–5 business days</strong>. You'll receive an email at every status change.
+      </div>
       <div style="text-align:center;margin:28px 0;">
         ${btn('Track My Application →', `${config.frontendUrl}/dashboard.html`)}
       </div>
