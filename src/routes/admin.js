@@ -5,9 +5,11 @@ const ctrl = require('../controllers/admin');
 // All admin routes require authentication + admin role
 router.use(authenticate, requireAdmin);
 
-router.get('/applications',              ctrl.listApplications);
+router.get('/applications', ctrl.listApplications);
+router.get('/applications/:ref', ctrl.getApplication);
 router.patch('/applications/:ref/status', ctrl.updateStatus);
-router.get('/users',                     ctrl.listUsers);
-router.patch('/users/:id/role',          ctrl.updateRole);
+router.get('/users', ctrl.listUsers);
+router.patch('/users/:id/role', ctrl.updateRole);
+router.get('/documents', ctrl.listDocuments);
 
 module.exports = router;
