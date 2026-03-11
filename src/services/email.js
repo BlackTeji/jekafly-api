@@ -33,8 +33,8 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
 const LOGO_URL = 'https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png';
-const BRAND = '#f80909';
-const DARK = '#213b68';
+const BRAND = '#0D1560';
+const DARK = '#ffffff';
 
 const layout = (content) => `
 <!DOCTYPE html>
