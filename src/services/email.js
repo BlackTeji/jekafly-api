@@ -32,6 +32,10 @@ const sendEmail = async ({ to, subject, html, text }) => {
 };
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
+const LOGO_URL = 'https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png';
+const BRAND = '#ff1414';
+const DARK = '#0a1f44';
+
 const layout = (content) => `
 <!DOCTYPE html>
 <html>
@@ -40,21 +44,25 @@ const layout = (content) => `
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:32px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
+        <!-- Header -->
         <tr>
-          <td style="background:#0a1f44;padding:24px 32px;border-radius:12px 12px 0 0;text-align:center;">
-            <span style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
-              ✈️ Jeka<span style="color:#e8613a;">fly</span>
-            </span>
-            <p style="margin:4px 0 0;color:#a0b4cc;font-size:12px;">Your Journey Simplified</p>
+          <td style="background:${DARK};padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
+            <img src="${LOGO_URL}" alt="Jekafly" width="160" style="display:block;margin:0 auto;max-width:160px;" />
+            <p style="margin:10px 0 0;color:#a0b4cc;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Your Journey Simplified</p>
           </td>
         </tr>
+        <!-- Orange accent bar -->
+        <tr>
+          <td style="background:${BRAND};height:4px;line-height:4px;font-size:0;">&nbsp;</td>
+        </tr>
+        <!-- Body -->
         <tr>
           <td style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;">
             ${content}
             <hr style="border:none;border-top:1px solid #eee;margin:32px 0 20px;">
             <p style="color:#9aa5b4;font-size:12px;text-align:center;margin:0;">
               © ${new Date().getFullYear()} Jekafly · All rights reserved<br>
-              <a href="${config.frontendUrl}" style="color:#e8613a;text-decoration:none;">jekafly.com</a>
+              <a href="${config.frontendUrl}" style="color:${BRAND};text-decoration:none;">jekafly.com</a>
             </p>
           </td>
         </tr>
@@ -65,7 +73,7 @@ const layout = (content) => `
 </html>`;
 
 const btn = (text, url) =>
-  `<a href="${url}" style="display:inline-block;background:#e8613a;color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;margin-top:8px;">${text}</a>`;
+  `<a href="${url}" style="display:inline-block;background:${BRAND};color:#fff;text-decoration:none;padding:14px 32px;border-radius:8px;font-weight:700;font-size:15px;margin-top:8px;">${text}</a>`;
 
 const infoRow = (label, value) =>
   `<tr>
