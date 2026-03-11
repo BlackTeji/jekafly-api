@@ -169,3 +169,37 @@ exports.listDocuments = async (req, res, next) => {
     res.json({ ok: true, data: { documents: docsWithUrls } });
   } catch (err) { next(err); }
 };
+
+// ─── GET /admin/applications/:ref ─────────────────────────────────────────────
+exports.getApplication = async (req, res, next) => {
+  try {
+    const prisma = require('../utils/prisma');
+    const app = await prisma.application.findUnique({
+      where: { ref: req.params.ref },
+      include: {
+        statusHistory: { orderBy: { createdAt: 'asc' } },
+        documents: {
+          select: { id: true, name: true, mimeType: true, size: true, uploadedAt: true, docIndex: true },
+        },
+        user: { select: { name: true, email: true, phone: true } },
+      },
+    });
+    if (!app) throw new (require('../middleware/error').ApiError)('Application not found.', 404);
+
+    res.json({
+      ok: true,
+      data: {
+        application: {
+          ...app,
+          fee: app.fee / 100,
+          status: app.status.toLowerCase(),
+          statusHistory: (app.statusHistory || []).map(h => ({
+            status: h.status.toLowerCase(),
+            note: h.note,
+            date: h.createdAt,
+          })),
+        },
+      },
+    });
+  } catch (err) { next(err); }
+};
