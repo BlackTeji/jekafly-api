@@ -1,40 +1,33 @@
-const nodemailer = require('nodemailer');
+const axios = require('axios');
 const config = require('../config');
 
-let transporter;
-const getTransporter = () => {
-  if (transporter) return transporter;
-  if (config.email.provider === 'resend') {
-    transporter = nodemailer.createTransport({
-      host: 'smtp.resend.com',
-      port: 465,
-      secure: true,
-      auth: { user: 'resend', pass: config.email.resendKey },
-    });
-  } else {
-    transporter = nodemailer.createTransport({
-      host: config.email.smtp.host,
-      port: config.email.smtp.port,
-      secure: config.email.smtp.port === 465,
-      auth: { user: config.email.smtp.user, pass: config.email.smtp.pass },
-    });
-  }
-  return transporter;
-};
-
+// Use Resend HTTP API directly (avoids SMTP port blocking on Railway)
 const sendEmail = async ({ to, subject, html, text }) => {
+  console.log(`[Email] Provider: ${config.email.provider} | Key: ${config.email.resendKey ? 'SET' : 'MISSING'} | From: ${config.email.from}`);
   if (config.nodeEnv === 'development') {
-    console.log(`[Email] To: ${to} | Subject: ${subject}`);
+    console.log(`[Email] Skipped (development) -> To: ${to} | Subject: ${subject}`);
+    return;
+  }
+  if (!config.email.resendKey) {
+    console.error('[Email Error] RESEND_API_KEY not set');
     return;
   }
   try {
-    await getTransporter().sendMail({
-      from: `"${config.email.fromName}" <${config.email.from}>`,
-      to, subject, html, text,
+    const res = await axios.post('https://api.resend.com/emails', {
+      from: `${config.email.fromName} <${config.email.from}>`,
+      to: [to],
+      subject,
+      html,
+      text,
+    }, {
+      headers: {
+        'Authorization': `Bearer ${config.email.resendKey}`,
+        'Content-Type': 'application/json',
+      },
     });
-    console.log(`[Email] Sent: ${subject} → ${to}`);
+    console.log(`[Email] Sent: ${subject} -> ${to} | ID: ${res.data?.id}`);
   } catch (err) {
-    console.error('[Email Error]', err.message);
+    console.error('[Email Error]', err.response?.data || err.message);
   }
 };
 
@@ -47,7 +40,6 @@ const layout = (content) => `
   <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:32px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%;">
-        <!-- Header -->
         <tr>
           <td style="background:#0a1f44;padding:24px 32px;border-radius:12px 12px 0 0;text-align:center;">
             <span style="font-size:26px;font-weight:800;color:#ffffff;letter-spacing:-0.5px;">
@@ -56,7 +48,6 @@ const layout = (content) => `
             <p style="margin:4px 0 0;color:#a0b4cc;font-size:12px;">Your Journey Simplified</p>
           </td>
         </tr>
-        <!-- Body -->
         <tr>
           <td style="background:#ffffff;padding:36px 32px;border-radius:0 0 12px 12px;">
             ${content}
@@ -94,7 +85,6 @@ const emails = {
     html: layout(`
       <h2 style="color:#0a1f44;margin:0 0 8px;">Welcome aboard, ${user.name.split(' ')[0]}! 🎉</h2>
       <p style="color:#555;line-height:1.6;">Your Jekafly account is ready. We make visa applications simple, fast, and stress-free.</p>
-      <p style="color:#555;line-height:1.6;">Here's what you can do:</p>
       <ul style="color:#555;line-height:2;">
         <li>📋 Apply for visas to 50+ destinations</li>
         <li>📁 Upload and manage your documents</li>
@@ -124,7 +114,6 @@ const emails = {
       <div style="text-align:center;margin:28px 0;">
         ${btn('Complete Payment →', `${config.frontendUrl}/payment.html`)}
       </div>
-      <p style="color:#9aa5b4;font-size:12px;">Questions? Reply to this email or contact our support team.</p>
     `),
   }),
 
@@ -141,7 +130,7 @@ const emails = {
         ${infoRow('Date', new Date().toDateString())}
         ${infoRow('Status', '✅ Confirmed')}
       `)}
-      <p style="color:#555;line-height:1.6;">We'll notify you at every stage of your application. Expected processing time is <strong>3–5 business days</strong>.</p>
+      <p style="color:#555;line-height:1.6;">Expected processing time is <strong>3–5 business days</strong>.</p>
       <div style="text-align:center;margin:28px 0;">
         ${btn('Track My Application →', `${config.frontendUrl}/dashboard.html`)}
       </div>
@@ -149,14 +138,7 @@ const emails = {
   }),
 
   statusUpdated: async (app, statusNote, user) => {
-    const labels = {
-      RECEIVED: '📥 Received',
-      PROCESSING: '🔄 Processing',
-      EMBASSY: '🏛️ Embassy Review',
-      APPROVED: '✅ Approved',
-      DELIVERED: '🎉 Delivered',
-      REJECTED: '❌ Rejected',
-    };
+    const labels = { RECEIVED: '📥 Received', PROCESSING: '🔄 Processing', EMBASSY: '🏛️ Embassy Review', APPROVED: '✅ Approved', DELIVERED: '🎉 Delivered', REJECTED: '❌ Rejected' };
     const isGood = ['APPROVED', 'DELIVERED'].includes(app.status);
     const isBad = app.status === 'REJECTED';
     const statusColor = isGood ? '#16a34a' : isBad ? '#dc2626' : '#e8613a';
@@ -171,7 +153,7 @@ const emails = {
           ${infoRow('Destination', app.destination)}
           ${infoRow('New Status', `<span style="color:${statusColor};font-weight:700;">${labels[app.status] || app.status}</span>`)}
         `)}
-        ${statusNote ? `<div style="background:#f8f9fb;border-left:4px solid ${statusColor};padding:14px 18px;border-radius:0 8px 8px 0;margin:16px 0;color:#444;font-size:14px;line-height:1.6;">${statusNote}</div>` : ''}
+        ${statusNote ? `<div style="background:#f8f9fb;border-left:4px solid ${statusColor};padding:14px 18px;border-radius:0 8px 8px 0;margin:16px 0;color:#444;font-size:14px;">${statusNote}</div>` : ''}
         <div style="text-align:center;margin:28px 0;">
           ${btn('View in Dashboard →', `${config.frontendUrl}/dashboard.html`)}
         </div>
@@ -189,7 +171,6 @@ const emails = {
       <div style="text-align:center;margin:28px 0;">
         ${btn('Book My Consultation →', `${config.frontendUrl}/dashboard.html`)}
       </div>
-      <p style="color:#9aa5b4;font-size:12px;">Can't find a suitable time? Reply to this email and we'll arrange something.</p>
     `),
   }),
 
@@ -218,7 +199,6 @@ const emails = {
     html: layout(`
       <h2 style="color:#0a1f44;margin:0 0 8px;">Password Changed 🔒</h2>
       <p style="color:#555;line-height:1.6;">Hi ${user.name.split(' ')[0]}, your Jekafly account password was just changed.</p>
-      <p style="color:#555;line-height:1.6;">If this was you, no action is needed.</p>
       <div style="background:#fff3f3;border-left:4px solid #dc2626;padding:14px 18px;border-radius:0 8px 8px 0;margin:16px 0;color:#444;font-size:14px;">
         ⚠️ If you did <strong>not</strong> make this change, please contact us immediately.
       </div>
