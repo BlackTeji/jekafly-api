@@ -33,7 +33,7 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
 const LOGO_URL = 'https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png';
-const BRAND = '#0D1560';
+const BRAND = '#fc0707';
 const DARK = '#ffffff';
 
 const layout = (content) => `
@@ -48,7 +48,7 @@ const layout = (content) => `
         <tr>
           <td style="background:${DARK};padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
             <img src="${LOGO_URL}" alt="Jekafly" width="160" style="display:block;margin:0 auto;max-width:160px;" />
-            <p style="margin:10px 0 0;color:#a0b4cc;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Your Journey Simplified</p>
+            <p style="margin:10px 0 0;color:#a0b4cc;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Travel The World with Ease</p>
           </td>
         </tr>
         <!-- Red accent bar -->
