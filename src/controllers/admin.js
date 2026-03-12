@@ -88,7 +88,10 @@ exports.listUsers = async (req, res, next) => {
     const page = Math.max(1, parseInt(req.query.page) || 1);
     const limit = Math.min(100, parseInt(req.query.limit) || 50);
     const skip = (page - 1) * limit;
-    const where = req.query.role ? { role: req.query.role.toUpperCase() } : {};
+    const baseWhere = { deletedAt: null };
+    const where = req.query.role
+      ? { ...baseWhere, role: req.query.role.toUpperCase() }
+      : baseWhere;
 
     const [users, total] = await Promise.all([
       prisma.user.findMany({
@@ -201,5 +204,46 @@ exports.getApplication = async (req, res, next) => {
         },
       },
     });
+  } catch (err) { next(err); }
+};
+
+// ─── DELETE /admin/users/:id ──────────────────────────────────────────────────
+exports.deleteUser = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    // Prevent admin deleting themselves
+    if (id === req.user.id) {
+      return res.status(400).json({ ok: false, error: 'You cannot delete your own admin account.' });
+    }
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) return res.status(404).json({ ok: false, error: 'User not found.' });
+    if (user.deletedAt) return res.status(400).json({ ok: false, error: 'User is already deleted.' });
+
+    const now = new Date();
+
+    // Archive all their applications — stamp deletedAt + preserve userId reference
+    await prisma.application.updateMany({
+      where: { userId: id },
+      data: { deletedAt: now, archivedUserId: id },
+    });
+
+    // Soft-delete the user — anonymise PII but keep the record
+    await prisma.user.update({
+      where: { id },
+      data: {
+        name: '[Deleted User]',
+        email: `deleted-${id}@jekafly.invalid`,
+        phone: null,
+        passwordHash: 'DELETED',
+        deletedAt: now,
+      },
+    });
+
+    // Hard-delete refresh tokens and documents (S3 keys stay, objects expire naturally)
+    await prisma.refreshToken.deleteMany({ where: { userId: id } });
+
+    res.json({ ok: true, data: { message: 'User deleted and data archived.' } });
   } catch (err) { next(err); }
 };

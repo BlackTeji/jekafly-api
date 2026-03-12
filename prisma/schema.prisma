@@ -15,6 +15,7 @@ model User {
   phone        String?
   passwordHash String
   role         Role          @default(USER)
+  deletedAt    DateTime?     // soft-delete timestamp
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
@@ -77,6 +78,8 @@ model Application {
   feeBreakdown    Json?
   travellers      Json?
 
+  deletedAt       DateTime?         // set when user is deleted
+  archivedUserId  String?            // preserves userId after user record wiped
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 

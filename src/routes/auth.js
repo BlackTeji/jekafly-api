@@ -10,5 +10,6 @@ router.get('/me', authenticate, ctrl.me);
 router.patch('/me', authenticate, ctrl.updateMe);
 router.post('/request-password-otp', authenticate, ctrl.requestPasswordOtp);
 router.post('/change-password', authenticate, ctrl.changePassword);
+router.delete('/me', authenticate, ctrl.deleteAccount);
 
 module.exports = router;

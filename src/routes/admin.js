@@ -10,6 +10,7 @@ router.get('/applications/:ref', ctrl.getApplication);
 router.patch('/applications/:ref/status', ctrl.updateStatus);
 router.get('/users', ctrl.listUsers);
 router.patch('/users/:id/role', ctrl.updateRole);
+router.delete('/users/:id', ctrl.deleteUser);
 router.get('/documents', ctrl.listDocuments);
 
 module.exports = router;
