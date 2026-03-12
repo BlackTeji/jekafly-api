@@ -71,6 +71,7 @@ exports.initiate = async (req, res, next) => {
         authorizationUrl: paystackData.authorization_url,
         accessCode: paystackData.access_code,
         reference: paystackData.reference,
+        publicKey: config.paystack.publicKey,
       }
     });
   } catch (err) { next(err); }
@@ -126,6 +127,7 @@ async function handleChargeSuccess(data) {
       where: { id: payment.applicationId },
       data: {
         paid: true,
+        fee: payment.amount, // amount already in kobo on payment record
         status: 'PROCESSING',
         statusHistory: {
           create: {
