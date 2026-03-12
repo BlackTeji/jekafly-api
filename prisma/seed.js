@@ -18,10 +18,10 @@ const DEFAULT_FEES = {
 async function main() {
   console.log('🌱 Seeding database...');
 
-  // Admin user
+  // Admin user — restore or create, always clearing deletedAt
   const adminHash = await bcrypt.hash('admin1234', 12);
   await prisma.user.upsert({
-    where: { email: 'admin@jekafly.com' },
+    where: { id: 'ADMIN001' },
     create: {
       id: 'ADMIN001',
       name: 'Jekafly Admin',
@@ -29,8 +29,16 @@ async function main() {
       phone: '+234 800 000 0001',
       passwordHash: adminHash,
       role: 'ADMIN',
+      deletedAt: null,
     },
-    update: { passwordHash: adminHash, role: 'ADMIN' },
+    update: {
+      name: 'Jekafly Admin',
+      email: 'admin@jekafly.com',
+      phone: '+234 800 000 0001',
+      passwordHash: adminHash,
+      role: 'ADMIN',
+      deletedAt: null,
+    },
   });
   console.log('✅ Admin user seeded');
 
