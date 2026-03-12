@@ -212,13 +212,14 @@ exports.deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Prevent admin deleting themselves
+    // Prevent deleting any admin account
     if (id === req.user.id) {
       return res.status(400).json({ ok: false, error: 'You cannot delete your own admin account.' });
     }
 
     const user = await prisma.user.findUnique({ where: { id } });
     if (!user) return res.status(404).json({ ok: false, error: 'User not found.' });
+    if (user.role === 'ADMIN') return res.status(400).json({ ok: false, error: 'Admin accounts cannot be deleted.' });
     if (user.deletedAt) return res.status(400).json({ ok: false, error: 'User is already deleted.' });
 
     const now = new Date();
