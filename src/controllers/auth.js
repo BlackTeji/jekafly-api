@@ -3,20 +3,20 @@ const { z } = require('zod');
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 const { generateAccessToken, generateRefreshToken, saveRefreshToken,
-        rotateRefreshToken, revokeAllRefreshTokens,
-        setRefreshCookie, clearRefreshCookie } = require('../utils/jwt');
-const { emails } = require('../services/email');
+  rotateRefreshToken, revokeAllRefreshTokens,
+  setRefreshCookie, clearRefreshCookie } = require('../utils/jwt');
+const { emails, sendEmail } = require('../services/email');
 
 // ─── Validation schemas ───────────────────────────────────────────────────────
 const registerSchema = z.object({
-  name:     z.string().min(2, 'Name must be at least 2 characters'),
-  email:    z.string().email('Invalid email address'),
-  phone:    z.string().optional(),
+  name: z.string().min(2, 'Name must be at least 2 characters'),
+  email: z.string().email('Invalid email address'),
+  phone: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 const loginSchema = z.object({
-  email:    z.string().email(),
+  email: z.string().email(),
   password: z.string().min(1),
 });
 
@@ -34,12 +34,12 @@ exports.register = async (req, res, next) => {
       select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
     });
 
-    const accessToken   = generateAccessToken(user.id, user.role);
-    const refreshToken  = generateRefreshToken();
+    const accessToken = generateAccessToken(user.id, user.role);
+    const refreshToken = generateRefreshToken();
     await saveRefreshToken(user.id, refreshToken);
     setRefreshCookie(res, refreshToken);
 
-    await emails.welcome(user).catch(() => {}); // fire-and-forget
+    await emails.welcome(user).catch(() => { }); // fire-and-forget
 
     res.status(201).json({ ok: true, data: { user, accessToken } });
   } catch (err) { next(err); }
@@ -56,8 +56,8 @@ exports.login = async (req, res, next) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new ApiError('Invalid email or password.', 401);
 
-    const safeUser     = { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role };
-    const accessToken  = generateAccessToken(user.id, user.role);
+    const safeUser = { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role };
+    const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken();
     await saveRefreshToken(user.id, refreshToken);
     setRefreshCookie(res, refreshToken);
@@ -112,7 +112,7 @@ exports.me = async (req, res, next) => {
 exports.updateMe = async (req, res, next) => {
   try {
     const schema = z.object({
-      name:  z.string().min(2).optional(),
+      name: z.string().min(2).optional(),
       phone: z.string().optional(),
     });
     const { name, phone } = schema.parse(req.body);
@@ -126,15 +126,60 @@ exports.updateMe = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── POST /auth/change-password ───────────────────────────────────────────────
+
+// ─── In-memory OTP store (keyed by userId, expires in 10 min) ─────────────────
+const otpStore = new Map(); // userId -> { otp, expiresAt }
+
+const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
+
+// ─── POST /auth/request-password-otp ──────────────────────────────────────────
+exports.requestPasswordOtp = async (req, res, next) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user) throw new ApiError('User not found.', 404);
+
+    const otp = generateOtp();
+    otpStore.set(user.id, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+
+    // Send OTP email
+    await sendEmail({
+      to: user.email,
+      subject: 'Your Jekafly Password Change OTP',
+      html: `
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#f7f8fc;border-radius:16px;">
+          <img src="https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png" style="height:36px;margin-bottom:24px;" />
+          <h2 style="color:#0a1f44;font-size:1.4rem;margin-bottom:8px;">Password Change Request</h2>
+          <p style="color:#6b7280;font-size:0.9rem;margin-bottom:24px;">Use the OTP below to confirm your password change. It expires in <strong>10 minutes</strong>.</p>
+          <div style="background:#0a1f44;color:#fff;font-size:2rem;font-weight:800;letter-spacing:.3em;text-align:center;padding:20px;border-radius:12px;margin-bottom:24px;">${otp}</div>
+          <p style="color:#9ca3af;font-size:0.78rem;">If you did not request this, ignore this email — your password will not change.</p>
+        </div>`,
+    });
+
+    res.json({ ok: true, data: { message: 'OTP sent to your email.' } });
+  } catch (err) { next(err); }
+};
+
+// ─── POST /auth/change-password ── (updated to require OTP) ───────────────────
 exports.changePassword = async (req, res, next) => {
   try {
     const schema = z.object({
       currentPassword: z.string().min(1),
-      newPassword:     z.string().min(8, 'New password must be at least 8 characters'),
+      newPassword: z.string().min(8, 'New password must be at least 8 characters'),
+      otp: z.string().length(6, 'OTP must be 6 digits'),
     });
-    const { currentPassword, newPassword } = schema.parse(req.body);
+    const { currentPassword, newPassword, otp } = schema.parse(req.body);
 
+    // Verify OTP
+    const stored = otpStore.get(req.user.id);
+    if (!stored) throw new ApiError('No OTP found. Please request a new one.', 400);
+    if (Date.now() > stored.expiresAt) {
+      otpStore.delete(req.user.id);
+      throw new ApiError('OTP has expired. Please request a new one.', 400);
+    }
+    if (stored.otp !== otp) throw new ApiError('Invalid OTP.', 400);
+    otpStore.delete(req.user.id);
+
+    // Verify current password
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) throw new ApiError('Current password is incorrect.', 400);
@@ -142,11 +187,9 @@ exports.changePassword = async (req, res, next) => {
     const passwordHash = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({ where: { id: req.user.id }, data: { passwordHash } });
 
-    // Revoke all sessions — force re-login everywhere
     await revokeAllRefreshTokens(req.user.id);
     clearRefreshCookie(res);
-
-    await emails.passwordChanged(req.user).catch(() => {});
+    await emails.passwordChanged(req.user).catch(() => { });
 
     res.json({ ok: true, data: { message: 'Password updated. Please log in again.' } });
   } catch (err) { next(err); }
