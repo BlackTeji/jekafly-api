@@ -194,3 +194,57 @@ exports.changePassword = async (req, res, next) => {
     res.json({ ok: true, data: { message: 'Password updated. Please log in again.' } });
   } catch (err) { next(err); }
 };
+
+
+// ─── DELETE /auth/me ── self-delete with password confirmation ────────────────
+exports.deleteAccount = async (req, res, next) => {
+  try {
+    const schema = z.object({ password: z.string().min(1) });
+    const { password } = schema.parse(req.body);
+
+    const user = await prisma.user.findUnique({ where: { id: req.user.id } });
+    if (!user || user.deletedAt) throw new ApiError('Account not found.', 404);
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) throw new ApiError('Password is incorrect.', 400);
+
+    const now = new Date();
+
+    // Archive applications
+    await prisma.application.updateMany({
+      where: { userId: req.user.id },
+      data: { deletedAt: now, archivedUserId: req.user.id },
+    });
+
+    // Anonymise user PII
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: {
+        name: '[Deleted User]',
+        email: `deleted-${req.user.id}@jekafly.invalid`,
+        phone: null,
+        passwordHash: 'DELETED',
+        deletedAt: now,
+      },
+    });
+
+    // Revoke sessions
+    await prisma.refreshToken.deleteMany({ where: { userId: req.user.id } });
+    clearRefreshCookie(res);
+
+    // Send goodbye email before anonymising (use original user object we already fetched)
+    const { sendEmail } = require('../services/email');
+    await sendEmail({
+      to: user.email,
+      subject: 'Your Jekafly account has been deleted',
+      html: `<div style="font-family:'Plus Jakarta Sans',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#f7f8fc;border-radius:16px;">
+        <h2 style="color:#0a1f44;">Account Deleted</h2>
+        <p style="color:#6b7280;">Hi ${user.name}, your Jekafly account and personal data have been permanently deleted as requested.</p>
+        <p style="color:#6b7280;font-size:0.85rem;">Your visa application records have been archived for legal/compliance purposes but your personal details have been removed.</p>
+        <p style="color:#9ca3af;font-size:0.78rem;margin-top:24px;">If this wasn't you, please contact support@jekafly.com immediately.</p>
+      </div>`,
+    }).catch(() => { });
+
+    res.json({ ok: true, data: { message: 'Account deleted.' } });
+  } catch (err) { next(err); }
+};
