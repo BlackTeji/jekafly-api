@@ -66,6 +66,8 @@ exports.updateStatus = async (req, res, next) => {
         status,
         // Auto-mark as paid when approved or delivered
         ...((['APPROVED', 'DELIVERED'].includes(status)) && { paid: true }),
+        // Stamp delivery timestamp for survey scheduling
+        ...(status === 'DELIVERED' && { deliveredAt: new Date() }),
         statusHistory: { create: { status, note } },
       },
       include: { statusHistory: { orderBy: { createdAt: 'asc' } } },
