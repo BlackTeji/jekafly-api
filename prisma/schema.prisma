@@ -78,6 +78,7 @@ model Application {
   feeBreakdown    Json?
   travellers      Json?
 
+  deliveredAt     DateTime?         // when status was set to DELIVERED
   deletedAt       DateTime?         // set when user is deleted
   archivedUserId  String?            // preserves userId after user record wiped
   createdAt       DateTime          @default(now())
@@ -86,6 +87,8 @@ model Application {
   statusHistory   StatusHistory[]
   documents       Document[]
   payments        Payment[]
+  review          Review?
+  review          Review?
 
   @@map("applications")
 }
@@ -228,4 +231,24 @@ model VisaRequirement {
   updatedAt   DateTime @updatedAt
 
   @@map("visa_requirements")
+}
+
+// ─── Reviews ─────────────────────────────────────────────────────────────────
+model Review {
+  id             String   @id @default(uuid())
+  applicationRef String   @unique  // one review per application
+  userId         String?
+  name           String            // display name (can be partial)
+  destination    String
+  rating         Int               // 1-5
+  text           String
+  approved       Boolean  @default(false)
+  surveyToken    String   @unique  // one-time token from email link
+  surveyUsed     Boolean  @default(false)
+  surveysentAt   DateTime?         // when survey email was sent
+  createdAt      DateTime @default(now())
+
+  application    Application @relation(fields: [applicationRef], references: [ref])
+
+  @@map("reviews")
 }
