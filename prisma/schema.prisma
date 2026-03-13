@@ -88,7 +88,6 @@ model Application {
   documents       Document[]
   payments        Payment[]
   review          Review?
-  review          Review?
 
   @@map("applications")
 }
