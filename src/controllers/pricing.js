@@ -11,6 +11,7 @@ const pricingSchema = z.object({
     insuranceBasic: z.number().int().min(0).optional(),
     insuranceStandard: z.number().int().min(0).optional(),
     insurancePremium: z.number().int().min(0).optional(),
+    processingFeePercent: z.number().int().min(0).max(20).optional(),
 });
 
 // GET /pricing — public, returns current prices

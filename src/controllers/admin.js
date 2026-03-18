@@ -33,7 +33,6 @@ exports.listApplications = async (req, res, next) => {
       prisma.application.count({ where }),
     ]);
 
-    // Compute stats
     const all = await prisma.application.findMany({
       select: { status: true, paid: true, fee: true },
     });
@@ -64,16 +63,13 @@ exports.updateStatus = async (req, res, next) => {
       where: { ref: req.params.ref },
       data: {
         status,
-        // Auto-mark as paid when approved or delivered
         ...((['APPROVED', 'DELIVERED'].includes(status)) && { paid: true }),
-        // Stamp delivery timestamp for survey scheduling
         ...(status === 'DELIVERED' && { deliveredAt: new Date() }),
         statusHistory: { create: { status, note } },
       },
       include: { statusHistory: { orderBy: { createdAt: 'asc' } } },
     });
 
-    // Notify applicant
     const user = await prisma.user.findUnique({
       where: { id: app.userId },
       select: { name: true, email: true },
@@ -100,7 +96,7 @@ exports.listUsers = async (req, res, next) => {
         where, skip, take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
-          id: true, name: true, email: true, phone: true, role: true, createdAt: true,
+          id: true, name: true, email: true, phone: true, role: true, adminRole: true, createdAt: true,
           _count: { select: { applications: true } }
         },
       }),
@@ -214,7 +210,6 @@ exports.deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    // Prevent deleting any admin account
     if (id === req.user.id) {
       return res.status(400).json({ ok: false, error: 'You cannot delete your own admin account.' });
     }
@@ -226,13 +221,11 @@ exports.deleteUser = async (req, res, next) => {
 
     const now = new Date();
 
-    // Archive all their applications — stamp deletedAt + preserve userId reference
     await prisma.application.updateMany({
       where: { userId: id },
       data: { deletedAt: now, archivedUserId: id },
     });
 
-    // Soft-delete the user — anonymise PII but keep the record
     await prisma.user.update({
       where: { id },
       data: {
@@ -244,9 +237,44 @@ exports.deleteUser = async (req, res, next) => {
       },
     });
 
-    // Hard-delete refresh tokens and documents (S3 keys stay, objects expire naturally)
     await prisma.refreshToken.deleteMany({ where: { userId: id } });
 
     res.json({ ok: true, data: { message: 'User deleted and data archived.' } });
+  } catch (err) { next(err); }
+};
+
+// ── PATCH /admin/users/:id/admin-role ─────────────────────────────────────────
+exports.updateAdminRole = async (req, res, next) => {
+  try {
+    const { z } = require('zod');
+    const { adminRole } = z.object({
+      adminRole: z.enum(['super', 'applications', 'finance', 'consultations', 'affiliates']),
+    }).parse(req.body);
+
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) return res.status(404).json({ ok: false, error: 'User not found.' });
+    if (target.role !== 'ADMIN') return res.status(400).json({ ok: false, error: 'User is not an admin.' });
+
+    const user = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { adminRole },
+      select: { id: true, name: true, email: true, role: true, adminRole: true },
+    });
+
+    res.json({ ok: true, data: { user } });
+  } catch (err) { next(err); }
+};
+
+// ── GET /admin/flight-bookings (stub — returns empty until booking system is live) ──
+exports.listFlightBookings = async (req, res, next) => {
+  try {
+    res.json({ ok: true, data: { bookings: [], total: 0 } });
+  } catch (err) { next(err); }
+};
+
+// ── GET /admin/hotel-bookings (stub) ──────────────────────────────────────────
+exports.listHotelBookings = async (req, res, next) => {
+  try {
+    res.json({ ok: true, data: { bookings: [], total: 0 } });
   } catch (err) { next(err); }
 };

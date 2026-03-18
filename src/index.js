@@ -30,6 +30,10 @@ const paymentRoutes = require('./routes/payments');
 const insuranceRoutes = require('./routes/insurance');
 const visaRoutes = require('./routes/visa');
 const pricingRoutes = require('./routes/pricing');
+const reviewRoutes = require('./routes/reviews');
+const affiliateRoutes = require('./routes/affiliates');
+const flightRoutes = require('./routes/flights');
+const hotelRoutes = require('./routes/hotels');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -37,7 +41,7 @@ app.set('trust proxy', 1);
 app.use(helmet());
 app.use(cors({
   origin: function (origin, callback) {
-    if (!origin) return callback(null, true); // allow server-to-server / curl
+    if (!origin) return callback(null, true);
     const primary = config.frontendUrl;
     const allowed = [
       primary,
@@ -46,7 +50,6 @@ app.use(cors({
       'http://127.0.0.1:5500',
       'http://127.0.0.1:5506',
     ].filter(Boolean);
-    // Also allow any vercel.app preview deployments for this project
     const isVercelPreview = /^https:\/\/jekafly-frontend[a-z0-9-]*\.vercel\.app$/.test(origin);
     if (allowed.includes(origin) || isVercelPreview) return callback(null, origin);
     return callback(new Error('Not allowed by CORS'));
@@ -92,6 +95,10 @@ app.use('/api/v1/payments', paymentRoutes);
 app.use('/api/v1/insurance', insuranceRoutes);
 app.use('/api/v1/visa-requirements', visaRoutes);
 app.use('/api/v1/pricing', pricingRoutes);
+app.use('/api/v1/reviews', reviewRoutes);
+app.use('/api/v1/affiliates', affiliateRoutes);
+app.use('/api/v1/flights', flightRoutes);
+app.use('/api/v1/hotels', hotelRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
@@ -99,12 +106,10 @@ app.use(errorHandler);
 // ─── DB setup + seed + start ──────────────────────────────────────────────────
 async function start() {
   try {
-    // Patch enum via Prisma raw query (no extra packages needed)
     const { PrismaClient } = require('@prisma/client');
     const bcrypt = require('bcryptjs');
     const db = new PrismaClient();
 
-    // Add CONSULTATION to enum if missing
     try {
       await db.$executeRawUnsafe(`
         DO $$ BEGIN
@@ -112,19 +117,34 @@ async function start() {
         EXCEPTION WHEN duplicate_object THEN NULL;
         END $$;
       `);
-      // Add enabled column to fees table if missing
       await db.$executeRawUnsafe(`
         ALTER TABLE fees ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true;
       `);
-      // Add passportIssueDate column to applications table if missing
       await db.$executeRawUnsafe(`
         ALTER TABLE applications ADD COLUMN IF NOT EXISTS "passportIssueDate" TIMESTAMP;
       `);
-      // Ensure pricing_config singleton row exists
+      await db.$executeRawUnsafe(`
+        ALTER TABLE users ADD COLUMN IF NOT EXISTS "adminRole" TEXT;
+      `);
+      await db.$executeRawUnsafe(`
+        ALTER TABLE pricing_config ADD COLUMN IF NOT EXISTS "processingFeePercent" INTEGER NOT NULL DEFAULT 5;
+      `);
       await db.$executeRawUnsafe(`
         INSERT INTO pricing_config (id, "consultStandard", "consultPriority", "consultVip", "insuranceBasic", "insuranceStandard", "insurancePremium", "updatedAt")
         VALUES ('singleton', 15000, 25000, 50000, 25000, 45000, 80000, NOW())
         ON CONFLICT (id) DO NOTHING;
+      `);
+      await db.$executeRawUnsafe(`
+        DO $$ BEGIN
+          CREATE TYPE "AffiliateStatus" AS ENUM ('PENDING','APPROVED','REJECTED');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
+      `);
+      await db.$executeRawUnsafe(`
+        DO $$ BEGIN
+          CREATE TYPE "PayoutStatus" AS ENUM ('PENDING','PROCESSED');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;
       `);
       console.log('Enum patched.');
     } catch (e) {
@@ -177,6 +197,12 @@ async function start() {
     console.log(`   Environment: ${config.nodeEnv}`);
     console.log(`   Health:      http://localhost:${PORT}/health\n`);
   });
+
+  const { sendPendingSurveys } = require('./controllers/reviews');
+  sendPendingSurveys().catch(err => console.error('Survey scheduler error:', err));
+  setInterval(() => {
+    sendPendingSurveys().catch(err => console.error('Survey scheduler error:', err));
+  }, 60 * 60 * 1000);
 }
 
 start();

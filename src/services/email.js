@@ -1,7 +1,6 @@
 const axios = require('axios');
 const config = require('../config');
 
-// Use Resend HTTP API directly (avoids SMTP port blocking on Railway)
 const sendEmail = async ({ to, subject, html, text }) => {
   console.log(`[Email] Provider: ${config.email.provider} | Key: ${config.email.resendKey ? 'SET' : 'MISSING'} | From: ${config.email.from}`);
   if (config.nodeEnv === 'development') {
@@ -33,8 +32,8 @@ const sendEmail = async ({ to, subject, html, text }) => {
 
 // ─── Base layout ──────────────────────────────────────────────────────────────
 const LOGO_URL = 'https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png';
-const BRAND = '#fc0707';
-const DARK = '#ffffff';
+const BRAND = '#e8613a';
+const DARK = '#0a1f44';
 
 const layout = (content) => `
 <!DOCTYPE html>
@@ -48,10 +47,10 @@ const layout = (content) => `
         <tr>
           <td style="background:${DARK};padding:28px 32px;border-radius:12px 12px 0 0;text-align:center;">
             <img src="${LOGO_URL}" alt="Jekafly" width="160" style="display:block;margin:0 auto;max-width:160px;" />
-            <p style="margin:10px 0 0;color:#a0b4cc;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Travel The World with Ease</p>
+            <p style="margin:10px 0 0;color:#a0b4cc;font-size:12px;letter-spacing:1px;text-transform:uppercase;">Your Journey Simplified</p>
           </td>
         </tr>
-        <!-- Red accent bar -->
+        <!-- Orange accent bar -->
         <tr>
           <td style="background:${BRAND};height:4px;line-height:4px;font-size:0;">&nbsp;</td>
         </tr>
@@ -202,6 +201,65 @@ const emails = {
       `)}
       <div style="text-align:center;margin:28px 0;">
         ${btn('View Dashboard →', `${config.frontendUrl}/dashboard.html`)}
+      </div>
+    `),
+  }),
+
+
+  affiliateApplicationReceived: async (affiliate) => sendEmail({
+    to: process.env.ADMIN_EMAIL || 'admin@jekafly.com',
+    subject: `🤝 New Affiliate Application — ${affiliate.name}`,
+    html: layout(`
+      <h2 style="color:${DARK};margin:0 0 8px;">New Affiliate Application 🤝</h2>
+      <p style="color:#555;line-height:1.6;">A new affiliate application has been submitted and is awaiting review.</p>
+      ${infoTable(`
+        ${infoRow('Name', affiliate.name)}
+        ${infoRow('Email', affiliate.email)}
+        ${infoRow('Phone', affiliate.phone || '—')}
+        ${infoRow('Location', affiliate.location || '—')}
+        ${infoRow('Channel', affiliate.channel || '—')}
+        ${infoRow('Audience Size', affiliate.audienceSize || '—')}
+        ${infoRow('Profile URL', affiliate.profileUrl ? `<a href="${affiliate.profileUrl}">${affiliate.profileUrl}</a>` : '—')}
+      `)}
+      ${affiliate.motivation ? `<div style="background:#f8f9fb;border-left:4px solid ${BRAND};padding:14px 18px;border-radius:0 8px 8px 0;margin:16px 0;color:#444;font-size:14px;line-height:1.6;"><strong>Why they want to join:</strong><br>${affiliate.motivation}</div>` : ''}
+      <div style="text-align:center;margin:28px 0;">
+        ${btn('Review in Admin Panel →', `${config.frontendUrl}/admin.html`)}
+      </div>
+    `),
+  }),
+
+  affiliateApproved: async (affiliate) => sendEmail({
+    to: affiliate.email,
+    subject: '🎉 Your Affiliate Application is Approved — Jekafly',
+    html: layout(`
+      <h2 style="color:${DARK};margin:0 0 8px;">You're Approved! 🎉</h2>
+      <p style="color:#555;line-height:1.6;">Hi ${affiliate.name.split(' ')[0]}, congratulations! Your Jekafly affiliate application has been approved.</p>
+      ${infoTable(`
+        ${infoRow('Your Referral Code', `<strong style="font-size:18px;letter-spacing:2px;">${affiliate.referralCode}</strong>`)}
+        ${infoRow('Your Referral Link', `<a href="${config.frontendUrl}/apply.html?ref=${affiliate.referralCode}" style="color:${BRAND};">${config.frontendUrl}/apply.html?ref=${affiliate.referralCode}</a>`)}
+        ${infoRow('Commission Tier', 'Starter (8%) — grows with your referrals')}
+        ${infoRow('Payout Schedule', 'Weekly, every Friday')}
+      `)}
+      <div style="background:#f0fdf4;border-left:4px solid #16a34a;padding:14px 18px;border-radius:0 8px 8px 0;margin:16px 0;color:#444;font-size:14px;line-height:1.6;">
+        🎯 <strong>How to get started:</strong><br>
+        Share your referral link on social media, WhatsApp, or your website. Every client who applies through your link and completes a paid application earns you a commission.
+      </div>
+      <div style="text-align:center;margin:28px 0;">
+        ${btn('View Your Dashboard →', `${config.frontendUrl}/affiliate.html`)}
+      </div>
+    `),
+  }),
+
+  affiliateRejected: async (affiliate) => sendEmail({
+    to: affiliate.email,
+    subject: 'Update on Your Affiliate Application — Jekafly',
+    html: layout(`
+      <h2 style="color:${DARK};margin:0 0 8px;">Application Update</h2>
+      <p style="color:#555;line-height:1.6;">Hi ${affiliate.name.split(' ')[0]}, thank you for applying to the Jekafly Affiliate Programme.</p>
+      <p style="color:#555;line-height:1.6;">After reviewing your application, we're unable to approve it at this time. This may be due to the information provided or our current capacity for new affiliates.</p>
+      <p style="color:#555;line-height:1.6;">You're welcome to reapply in the future with updated information. If you have any questions, please contact us.</p>
+      <div style="text-align:center;margin:28px 0;">
+        ${btn('Contact Support →', `${config.frontendUrl}/index.html`)}
       </div>
     `),
   }),

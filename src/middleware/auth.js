@@ -3,7 +3,6 @@ const config = require('../config');
 const { ApiError } = require('./error');
 const prisma = require('../utils/prisma');
 
-// Verify access token and attach user to req
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -15,7 +14,7 @@ const authenticate = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, name: true, email: true, phone: true, role: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, adminRole: true },
     });
     if (!user) throw new ApiError('User not found.', 401);
 
@@ -26,7 +25,6 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-// Require admin role
 const requireAdmin = (req, res, next) => {
   if (req.user?.role !== 'ADMIN') {
     return next(new ApiError('Admin access required.', 403));
@@ -34,7 +32,6 @@ const requireAdmin = (req, res, next) => {
   next();
 };
 
-// Optionally attach user if token is present (for public routes that behave differently when authed)
 const optionalAuth = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -48,7 +45,7 @@ const optionalAuth = async (req, res, next) => {
     if (user) req.user = user;
     next();
   } catch {
-    next(); // ignore token errors on optional auth
+    next();
   }
 };
 

@@ -31,7 +31,7 @@ exports.register = async (req, res, next) => {
     const passwordHash = await bcrypt.hash(password, 12);
     const user = await prisma.user.create({
       data: { name, email, phone, passwordHash, role: 'USER' },
-      select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, adminRole: true, createdAt: true },
     });
 
     const accessToken = generateAccessToken(user.id, user.role);
@@ -39,7 +39,7 @@ exports.register = async (req, res, next) => {
     await saveRefreshToken(user.id, refreshToken);
     setRefreshCookie(res, refreshToken);
 
-    await emails.welcome(user).catch(() => { }); // fire-and-forget
+    await emails.welcome(user).catch(() => { });
 
     res.status(201).json({ ok: true, data: { user, accessToken } });
   } catch (err) { next(err); }
@@ -102,7 +102,7 @@ exports.me = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.id },
-      select: { id: true, name: true, email: true, phone: true, role: true, createdAt: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, adminRole: true, createdAt: true },
     });
     res.json({ ok: true, data: { user } });
   } catch (err) { next(err); }
@@ -120,7 +120,7 @@ exports.updateMe = async (req, res, next) => {
     const user = await prisma.user.update({
       where: { id: req.user.id },
       data: { ...(name && { name }), ...(phone !== undefined && { phone }) },
-      select: { id: true, name: true, email: true, phone: true, role: true },
+      select: { id: true, name: true, email: true, phone: true, role: true, adminRole: true },
     });
     res.json({ ok: true, data: { user } });
   } catch (err) { next(err); }
@@ -128,7 +128,7 @@ exports.updateMe = async (req, res, next) => {
 
 
 // ─── In-memory OTP store (keyed by userId, expires in 10 min) ─────────────────
-const otpStore = new Map(); // userId -> { otp, expiresAt }
+const otpStore = new Map();
 
 const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 
@@ -141,7 +141,6 @@ exports.requestPasswordOtp = async (req, res, next) => {
     const otp = generateOtp();
     otpStore.set(user.id, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
 
-    // Send OTP email
     await sendEmail({
       to: user.email,
       subject: 'Your Jekafly Password Change OTP',
@@ -169,7 +168,6 @@ exports.changePassword = async (req, res, next) => {
     });
     const { currentPassword, newPassword, otp } = schema.parse(req.body);
 
-    // Verify OTP
     const stored = otpStore.get(req.user.id);
     if (!stored) throw new ApiError('No OTP found. Please request a new one.', 400);
     if (Date.now() > stored.expiresAt) {
@@ -179,7 +177,6 @@ exports.changePassword = async (req, res, next) => {
     if (stored.otp !== otp) throw new ApiError('Invalid OTP.', 400);
     otpStore.delete(req.user.id);
 
-    // Verify current password
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
     if (!valid) throw new ApiError('Current password is incorrect.', 400);
@@ -210,13 +207,11 @@ exports.deleteAccount = async (req, res, next) => {
 
     const now = new Date();
 
-    // Archive applications
     await prisma.application.updateMany({
       where: { userId: req.user.id },
       data: { deletedAt: now, archivedUserId: req.user.id },
     });
 
-    // Anonymise user PII
     await prisma.user.update({
       where: { id: req.user.id },
       data: {
@@ -228,11 +223,9 @@ exports.deleteAccount = async (req, res, next) => {
       },
     });
 
-    // Revoke sessions
     await prisma.refreshToken.deleteMany({ where: { userId: req.user.id } });
     clearRefreshCookie(res);
 
-    // Send goodbye email before anonymising (use original user object we already fetched)
     const { sendEmail } = require('../services/email');
     await sendEmail({
       to: user.email,
