@@ -12,7 +12,7 @@ exports.initiate = async (req, res, next) => {
     const schema = z.object({
       type: z.enum(['VISA', 'INSURANCE', 'CONSULTATION']),
       ref: z.string().optional(),
-      amount: z.number().min(1),         // kobo
+      amount: z.number().min(1),
       email: z.string().email(),
       metadata: z.any().optional(),
     });
@@ -26,10 +26,8 @@ exports.initiate = async (req, res, next) => {
       applicationId = app.id;
     }
 
-    // Generate unique Paystack reference
     const reference = `JKF-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-    // Create pending payment record first
     await prisma.payment.create({
       data: {
         userId: req.user.id,
@@ -42,12 +40,10 @@ exports.initiate = async (req, res, next) => {
       }
     });
 
-    // Guard: Paystack not configured
     if (!config.paystack.secretKey) {
       throw new ApiError('Payment processing is not yet configured. Please contact support.', 503);
     }
 
-    // Call Paystack
     let paystackData;
     try {
       paystackData = await paystack.initializeTransaction({
@@ -60,7 +56,6 @@ exports.initiate = async (req, res, next) => {
           : `${config.frontendUrl}/payment.html?ref=${reference}`,
       });
     } catch (paystackErr) {
-      // Clean up the pending payment record
       await prisma.payment.delete({ where: { reference } }).catch(() => { });
       throw new ApiError(paystackErr.message || 'Payment gateway error. Please try again.', 502);
     }
@@ -78,12 +73,10 @@ exports.initiate = async (req, res, next) => {
 };
 
 // ─── POST /payments/webhook ───────────────────────────────────────────────────
-// Paystack calls this directly. Body is raw Buffer (see index.js).
 exports.webhook = async (req, res, next) => {
   try {
     const signature = req.headers['x-paystack-signature'];
 
-    // Always respond 200 quickly to Paystack, process async
     res.sendStatus(200);
 
     if (!paystack.validateWebhookSignature(req.body, signature)) {
@@ -105,9 +98,8 @@ async function handleChargeSuccess(data) {
   const { reference, amount } = data;
 
   const payment = await prisma.payment.findUnique({ where: { reference } });
-  if (!payment || payment.status === 'SUCCESS') return; // already processed
+  if (!payment || payment.status === 'SUCCESS') return;
 
-  // Verify with Paystack server-side (don't trust webhook payload alone)
   const verified = await paystack.verifyTransaction(reference);
   if (verified.status !== 'success') return;
   if (verified.amount !== amount) {
@@ -115,19 +107,17 @@ async function handleChargeSuccess(data) {
     return;
   }
 
-  // Update payment record
   await prisma.payment.update({
     where: { reference },
     data: { status: 'SUCCESS', paidAt: new Date() },
   });
 
-  // If this is a visa payment — mark application paid + update status
   if (payment.type === 'VISA' && payment.applicationId) {
     const app = await prisma.application.update({
       where: { id: payment.applicationId },
       data: {
         paid: true,
-        fee: payment.amount, // amount already in kobo on payment record
+        fee: payment.amount,
         status: 'PROCESSING',
         statusHistory: {
           create: {
@@ -145,7 +135,6 @@ async function handleChargeSuccess(data) {
     if (user) await emails.paymentConfirmed(app, payment, user).catch(() => { });
   }
 
-  // If this is an insurance payment — create policy
   if (payment.type === 'INSURANCE') {
     const meta = payment.metadata || {};
     const policy = await prisma.insurancePolicy.create({
@@ -156,7 +145,7 @@ async function handleChargeSuccess(data) {
         destination: meta.destination,
         travelDate: meta.date ? new Date(meta.date) : null,
         travellers: parseInt(meta.travellers) || 1,
-        amount: amount / 100,  // store in naira
+        amount: amount / 100,
         status: 'active',
       }
     });
@@ -168,7 +157,6 @@ async function handleChargeSuccess(data) {
     if (user) await emails.insurancePolicy(policy, user).catch(() => { });
   }
 
-  // If this is a consultation payment — send confirmation email
   if (payment.type === 'CONSULTATION') {
     const user = await prisma.user.findUnique({
       where: { id: payment.userId },
@@ -187,10 +175,8 @@ exports.verify = async (req, res, next) => {
     if (!payment) throw new ApiError('Payment not found.', 404);
     if (payment.userId !== req.user.id) throw new ApiError('Not authorised.', 403);
 
-    // Re-verify with Paystack
     const verified = await paystack.verifyTransaction(reference);
 
-    // Find linked application ref
     let appRef = null;
     if (payment.applicationId) {
       const app = await prisma.application.findUnique({
@@ -204,7 +190,7 @@ exports.verify = async (req, res, next) => {
       ok: true,
       data: {
         status: verified.status,
-        amount: verified.amount / 100,  // naira
+        amount: verified.amount / 100,
         reference,
         ref: appRef,
         receipt: {

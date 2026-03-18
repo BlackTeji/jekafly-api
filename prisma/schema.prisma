@@ -15,6 +15,7 @@ model User {
   phone        String?
   passwordHash String
   role         Role          @default(USER)
+  adminRole    String?       // granular admin access: super|applications|finance|consultations|affiliates
   deletedAt    DateTime?     // soft-delete timestamp
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -212,6 +213,7 @@ model PricingConfig {
   insuranceBasic        Int      @default(25000)
   insuranceStandard     Int      @default(45000)
   insurancePremium      Int      @default(80000)
+  processingFeePercent  Int      @default(5)        // % added on payment page
   updatedAt             DateTime @updatedAt
 
   @@map("pricing_config")
@@ -250,4 +252,70 @@ model Review {
   application    Application @relation(fields: [applicationRef], references: [ref])
 
   @@map("reviews")
+}
+
+// ─── Affiliates ───────────────────────────────────────────────────────────────
+model Affiliate {
+  id            String           @id @default(uuid())
+  userId        String?          // linked user account (optional — public can apply)
+  name          String
+  email         String           @unique
+  phone         String
+  location      String?
+  channel       String?          // promotion channel e.g. social_media
+  audienceSize  String?          // e.g. 1k_5k
+  profileUrl    String?
+  motivation    String?
+
+  // Bank details for payouts
+  bankAccount   String
+  bankName      String
+  accountName   String
+
+  // Referral
+  referralCode  String           @unique
+  status        AffiliateStatus  @default(PENDING)
+
+  // Stats
+  totalClicks      Int  @default(0)
+  totalReferrals   Int  @default(0)
+  totalEarned      Int  @default(0)   // kobo
+  totalPaid        Int  @default(0)   // kobo
+  balance          Int  @default(0)   // kobo — earned minus paid
+
+  payouts       AffiliatePayout[]
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("affiliates")
+}
+
+enum AffiliateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AffiliatePayout {
+  id            String          @id @default(uuid())
+  affiliateId   String
+  affiliate     Affiliate       @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+
+  amount        Int             // kobo
+  status        PayoutStatus    @default(PENDING)
+  bankName      String
+  accountNumber String
+  accountName   String
+  note          String?
+
+  requestedAt   DateTime @default(now())
+  processedAt   DateTime?
+
+  @@map("affiliate_payouts")
+}
+
+enum PayoutStatus {
+  PENDING
+  PROCESSED
 }
