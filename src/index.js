@@ -72,12 +72,12 @@ app.use('/api/', rateLimit({
   standardHeaders: true, legacyHeaders: false,
 }));
 app.use('/api/v1/auth/login', rateLimit({
-  windowMs: 15 * 60 * 1000, max: 20,
+  windowMs: 15 * 60 * 1000, max: 50,
   message: { ok: false, error: 'Too many login attempts. Please wait 15 minutes and try again.' },
   standardHeaders: true, legacyHeaders: false,
 }));
 app.use('/api/v1/auth/register', rateLimit({
-  windowMs: 60 * 60 * 1000, max: 20,
+  windowMs: 60 * 60 * 1000, max: 50,
   message: { ok: false, error: 'Too many registration attempts. Please try again later.' },
   standardHeaders: true, legacyHeaders: false,
 }));
