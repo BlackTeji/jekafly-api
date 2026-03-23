@@ -43,8 +43,11 @@ app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
     const primary = config.frontendUrl;
+    const wwwVariant = primary ? primary.replace('https://', 'https://www.') : null;
     const allowed = [
       primary,
+      wwwVariant,
+      'https://jekafly-frontend-verz.vercel.app',
       'http://localhost:5500',
       'http://localhost:5506',
       'http://127.0.0.1:5500',
