@@ -319,3 +319,48 @@ enum PayoutStatus {
   PENDING
   PROCESSED
 }
+
+model Airport {
+  id        String   @id @default(uuid())
+  iata      String   @unique // e.g., LOS, LHR
+  icao      String?  @unique // e.g., DNMM
+  name      String   // Full name of the airport
+  city      String
+  country   String
+  timezone  String?  // e.g., Africa/Lagos
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("airports")
+}
+
+model Destination {
+  id             Int      @id @default(autoincrement())
+  
+  // Maps to hd-city
+  cityName       String
+  
+  // Maps to hd-country (The selected value from your dropdown)
+  country        String
+  
+  flagUrl        String?
+  
+  // Maps to hd-image
+  heroImageUrl   String?
+  
+  // Maps to hd-price (₦/night)
+  startingPrice  Float?   @default(0)
+  
+  // Maps to hd-region (e.g., Middle East)
+  region         String?
+  
+  // Maps to hd-airport (Stores the hidden IATA code/ID)
+  nearestAirport String?
+  
+  // Metadata for tracking
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@map("destinations") // Optional: names the table "destinations" in your DB
+}

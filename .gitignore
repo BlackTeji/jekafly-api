@@ -1,0 +1,41 @@
+# ─── Environment & secrets ────────────────────────────────────
+.env
+.env.*
+!.env.example
+
+# ─── Dependencies ─────────────────────────────────────────────
+node_modules/
+
+# ─── Prisma generated client ──────────────────────────────────
+# The generated client is built from schema.prisma at deploy time
+# via `prisma generate` (run in postinstall). Never commit it.
+node_modules/.prisma/
+
+# ─── Logs ─────────────────────────────────────────────────────
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ─── Local upload storage (disk fallback when no S3) ──────────
+/tmp/jekafly-uploads/
+
+# ─── OS & editor artifacts ────────────────────────────────────
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ─── Build & coverage ─────────────────────────────────────────
+dist/
+build/
+coverage/
+.nyc_output/
+
+# ─── Misc ─────────────────────────────────────────────────────
+*.pem
+*.key
+*.crt
