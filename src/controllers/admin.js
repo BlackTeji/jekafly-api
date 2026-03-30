@@ -3,7 +3,7 @@ const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 const { emails } = require('../services/email');
 
-// ─── GET /admin/applications ──────────────────────────────────────────────────
+// GET /admin/applications
 exports.listApplications = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -47,7 +47,7 @@ exports.listApplications = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── PATCH /admin/applications/:ref/status ────────────────────────────────────
+// PATCH /admin/applications/:ref/status
 exports.updateStatus = async (req, res, next) => {
   try {
     const schema = z.object({
@@ -80,7 +80,7 @@ exports.updateStatus = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── GET /admin/users ─────────────────────────────────────────────────────────
+// GET /admin/users
 exports.listUsers = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -113,7 +113,7 @@ exports.listUsers = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── PATCH /admin/users/:id/role ──────────────────────────────────────────────
+// PATCH /admin/users/:id/role
 exports.updateRole = async (req, res, next) => {
   try {
     const { role } = z.object({ role: z.enum(['USER', 'ADMIN']) }).parse(req.body);
@@ -135,7 +135,7 @@ const fmt = (app) => ({
   })),
 });
 
-// ─── GET /admin/documents ─────────────────────────────────────────────────────
+// GET /admin/documents
 exports.listDocuments = async (req, res, next) => {
   try {
     const ref = req.query.ref;
@@ -171,7 +171,76 @@ exports.listDocuments = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── GET /admin/applications/:ref ─────────────────────────────────────────────
+// GET /admin/documents/zip?ref=JKF-xxxx
+exports.downloadDocumentsZip = async (req, res, next) => {
+  try {
+    const { ref } = req.query;
+    if (!ref) {
+      return res.status(400).json({ ok: false, error: 'ref query parameter is required.' });
+    }
+
+    const archiver = require('archiver');
+    const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+    const config = require('../config');
+
+    const app = await prisma.application.findUnique({ where: { ref } });
+    if (!app) {
+      return res.status(404).json({ ok: false, error: 'Application not found.' });
+    }
+
+    const docs = await prisma.document.findMany({
+      where: { applicationId: app.id },
+      orderBy: { uploadedAt: 'asc' },
+    });
+
+    if (!docs.length) {
+      return res.status(404).json({ ok: false, error: 'No documents found for this application.' });
+    }
+
+    const s3 = new S3Client({
+      region: config.aws.region,
+      credentials: {
+        accessKeyId: config.aws.accessKeyId,
+        secretAccessKey: config.aws.secretAccessKey,
+      },
+    });
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${ref}-documents.zip"`);
+    res.setHeader('Cache-Control', 'no-store');
+
+    archive.on('error', (err) => {
+      console.error('[ZIP] Archive error:', err);
+      if (!res.headersSent) {
+        res.status(500).json({ ok: false, error: 'ZIP generation failed.' });
+      } else {
+        res.destroy();
+      }
+    });
+
+    archive.pipe(res);
+
+    for (const doc of docs) {
+      if (!doc.key || doc.key.startsWith('local/')) continue;
+      try {
+        const command = new GetObjectCommand({
+          Bucket: config.aws.bucket,
+          Key: doc.key,
+        });
+        const { Body } = await s3.send(command);
+        archive.append(Body, { name: doc.name || `document-${doc.id}` });
+      } catch (err) {
+        console.error(`[ZIP] Failed to fetch doc ${doc.id}:`, err.message);
+      }
+    }
+
+    await archive.finalize();
+  } catch (err) { next(err); }
+};
+
+// GET /admin/applications/:ref
 exports.getApplication = async (req, res, next) => {
   try {
     const prisma = require('../utils/prisma');
@@ -205,7 +274,7 @@ exports.getApplication = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── DELETE /admin/users/:id ──────────────────────────────────────────────────
+// DELETE /admin/users/:id
 exports.deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -243,7 +312,7 @@ exports.deleteUser = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ── PATCH /admin/users/:id/admin-role ─────────────────────────────────────────
+// PATCH /admin/users/:id/admin-role
 exports.updateAdminRole = async (req, res, next) => {
   try {
     const { z } = require('zod');
@@ -265,14 +334,14 @@ exports.updateAdminRole = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ── GET /admin/flight-bookings (stub — returns empty until booking system is live) ──
+// GET /admin/flight-bookings
 exports.listFlightBookings = async (req, res, next) => {
   try {
     res.json({ ok: true, data: { bookings: [], total: 0 } });
   } catch (err) { next(err); }
 };
 
-// ── GET /admin/hotel-bookings (stub) ──────────────────────────────────────────
+// GET /admin/hotel-bookings
 exports.listHotelBookings = async (req, res, next) => {
   try {
     res.json({ ok: true, data: { bookings: [], total: 0 } });
