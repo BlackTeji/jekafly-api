@@ -3,7 +3,6 @@ const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 const { emails } = require('../services/email');
 
-// GET /admin/applications
 exports.listApplications = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -47,7 +46,6 @@ exports.listApplications = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// PATCH /admin/applications/:ref/status
 exports.updateStatus = async (req, res, next) => {
   try {
     const schema = z.object({
@@ -80,7 +78,6 @@ exports.updateStatus = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /admin/users
 exports.listUsers = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -113,7 +110,6 @@ exports.listUsers = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// PATCH /admin/users/:id/role
 exports.updateRole = async (req, res, next) => {
   try {
     const { role } = z.object({ role: z.enum(['USER', 'ADMIN']) }).parse(req.body);
@@ -135,7 +131,6 @@ const fmt = (app) => ({
   })),
 });
 
-// GET /admin/documents
 exports.listDocuments = async (req, res, next) => {
   try {
     const ref = req.query.ref;
@@ -171,76 +166,6 @@ exports.listDocuments = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /admin/documents/zip?ref=JKF-xxxx
-exports.downloadDocumentsZip = async (req, res, next) => {
-  try {
-    const { ref } = req.query;
-    if (!ref) {
-      return res.status(400).json({ ok: false, error: 'ref query parameter is required.' });
-    }
-
-    const archiver = require('archiver');
-    const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
-    const config = require('../config');
-
-    const app = await prisma.application.findUnique({ where: { ref } });
-    if (!app) {
-      return res.status(404).json({ ok: false, error: 'Application not found.' });
-    }
-
-    const docs = await prisma.document.findMany({
-      where: { applicationId: app.id },
-      orderBy: { uploadedAt: 'asc' },
-    });
-
-    if (!docs.length) {
-      return res.status(404).json({ ok: false, error: 'No documents found for this application.' });
-    }
-
-    const s3 = new S3Client({
-      region: config.aws.region,
-      credentials: {
-        accessKeyId: config.aws.accessKeyId,
-        secretAccessKey: config.aws.secretAccessKey,
-      },
-    });
-
-    const archive = archiver('zip', { zlib: { level: 6 } });
-
-    res.setHeader('Content-Type', 'application/zip');
-    res.setHeader('Content-Disposition', `attachment; filename="${ref}-documents.zip"`);
-    res.setHeader('Cache-Control', 'no-store');
-
-    archive.on('error', (err) => {
-      console.error('[ZIP] Archive error:', err);
-      if (!res.headersSent) {
-        res.status(500).json({ ok: false, error: 'ZIP generation failed.' });
-      } else {
-        res.destroy();
-      }
-    });
-
-    archive.pipe(res);
-
-    for (const doc of docs) {
-      if (!doc.key || doc.key.startsWith('local/')) continue;
-      try {
-        const command = new GetObjectCommand({
-          Bucket: config.aws.bucket,
-          Key: doc.key,
-        });
-        const { Body } = await s3.send(command);
-        archive.append(Body, { name: doc.name || `document-${doc.id}` });
-      } catch (err) {
-        console.error(`[ZIP] Failed to fetch doc ${doc.id}:`, err.message);
-      }
-    }
-
-    await archive.finalize();
-  } catch (err) { next(err); }
-};
-
-// GET /admin/applications/:ref
 exports.getApplication = async (req, res, next) => {
   try {
     const prisma = require('../utils/prisma');
@@ -274,7 +199,6 @@ exports.getApplication = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// DELETE /admin/users/:id
 exports.deleteUser = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -312,7 +236,6 @@ exports.deleteUser = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// PATCH /admin/users/:id/admin-role
 exports.updateAdminRole = async (req, res, next) => {
   try {
     const { z } = require('zod');
@@ -334,16 +257,98 @@ exports.updateAdminRole = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// GET /admin/flight-bookings
 exports.listFlightBookings = async (req, res, next) => {
   try {
     res.json({ ok: true, data: { bookings: [], total: 0 } });
   } catch (err) { next(err); }
 };
 
-// GET /admin/hotel-bookings
 exports.listHotelBookings = async (req, res, next) => {
   try {
     res.json({ ok: true, data: { bookings: [], total: 0 } });
+  } catch (err) { next(err); }
+};
+
+exports.streamDocument = async (req, res, next) => {
+  try {
+    const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+    const config = require('../config');
+
+    const doc = await prisma.document.findUnique({ where: { id: req.params.id } });
+    if (!doc) return res.status(404).json({ ok: false, error: 'Document not found.' });
+    if (!doc.key || doc.key.startsWith('local/')) {
+      return res.status(400).json({ ok: false, error: 'Document not available for streaming.' });
+    }
+
+    const s3 = new S3Client({
+      region: config.aws.region,
+      credentials: { accessKeyId: config.aws.accessKeyId, secretAccessKey: config.aws.secretAccessKey },
+    });
+
+    const { Body, ContentType, ContentLength } = await s3.send(
+      new GetObjectCommand({ Bucket: config.aws.bucket, Key: doc.key })
+    );
+
+    const disposition = req.query.download === '1'
+      ? `attachment; filename="${encodeURIComponent(doc.name)}"`
+      : `inline; filename="${encodeURIComponent(doc.name)}"`;
+
+    res.setHeader('Content-Type', ContentType || doc.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Disposition', disposition);
+    res.setHeader('Cache-Control', 'private, max-age=300');
+    if (ContentLength) res.setHeader('Content-Length', ContentLength);
+
+    Body.pipe(res);
+  } catch (err) { next(err); }
+};
+
+exports.downloadDocumentsZip = async (req, res, next) => {
+  try {
+    const { ref } = req.query;
+    if (!ref) return res.status(400).json({ ok: false, error: 'ref query parameter is required.' });
+
+    const archiver = require('archiver');
+    const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+    const config = require('../config');
+
+    const app = await prisma.application.findUnique({ where: { ref } });
+    if (!app) return res.status(404).json({ ok: false, error: 'Application not found.' });
+
+    const docs = await prisma.document.findMany({
+      where: { applicationId: app.id },
+      orderBy: { uploadedAt: 'asc' },
+    });
+
+    if (!docs.length) return res.status(404).json({ ok: false, error: 'No documents found.' });
+
+    const s3 = new S3Client({
+      region: config.aws.region,
+      credentials: { accessKeyId: config.aws.accessKeyId, secretAccessKey: config.aws.secretAccessKey },
+    });
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader('Content-Disposition', `attachment; filename="${ref}-documents.zip"`);
+    res.setHeader('Cache-Control', 'no-store');
+
+    archive.on('error', (err) => {
+      if (!res.headersSent) res.status(500).json({ ok: false, error: 'ZIP generation failed.' });
+      else res.destroy();
+    });
+
+    archive.pipe(res);
+
+    for (const doc of docs) {
+      if (!doc.key || doc.key.startsWith('local/')) continue;
+      try {
+        const { Body } = await s3.send(new GetObjectCommand({ Bucket: config.aws.bucket, Key: doc.key }));
+        archive.append(Body, { name: doc.name || `document-${doc.id}` });
+      } catch (err) {
+        console.error(`[ZIP] Skipping doc ${doc.id}:`, err.message);
+      }
+    }
+
+    await archive.finalize();
   } catch (err) { next(err); }
 };
