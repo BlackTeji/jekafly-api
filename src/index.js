@@ -160,7 +160,7 @@ async function start() {
     });
     console.log('Schema pushed.');
 
-    const adminHash = await bcrypt.hash('admin1234', 12);
+    const adminHash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'admin1234', 12);
     await db.user.upsert({
       where: { email: 'admin@jekafly.com' },
       create: {
