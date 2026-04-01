@@ -352,3 +352,29 @@ exports.downloadDocumentsZip = async (req, res, next) => {
     await archive.finalize();
   } catch (err) { next(err); }
 };
+
+exports.getAllPayments = async (req, res, next) => {
+  try {
+    const payments = await prisma.payment.findMany({
+      orderBy: { initiatedAt: 'desc' },
+      include: { user: { select: { name: true, email: true } } },
+    });
+    res.json({
+      ok: true,
+      data: {
+        payments: payments.map(p => ({
+          id: p.id,
+          type: p.type,
+          amount: p.amount,
+          status: p.status,
+          metadata: p.metadata,
+          reference: p.reference,
+          createdAt: p.initiatedAt,
+          paidAt: p.paidAt,
+          userName: p.user?.name || null,
+          email: p.user?.email || null,
+        }))
+      }
+    });
+  } catch (err) { next(err); }
+};

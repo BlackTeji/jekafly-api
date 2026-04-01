@@ -31,6 +31,12 @@ exports.create = async (req, res, next) => {
     const data = appSchema.parse(req.body);
     const ref = await generateRef();
 
+    const hasDocuments = !!req.body.hasDocuments;
+    const initialStatus = hasDocuments ? 'PROCESSING' : 'RECEIVED';
+    const initialNote = hasDocuments
+      ? 'Application received. Documents submitted — under review.'
+      : 'Application received. Awaiting document submission.';
+
     const app = await prisma.application.create({
       data: {
         ref,
@@ -50,12 +56,12 @@ exports.create = async (req, res, next) => {
         dob: toDate(data.dob),
         travellers: data.travellers || [],
         feeBreakdown: data.feeBreakdown,
-        fee: data.fee ? Math.round(data.fee * 100) : 0, // store in kobo
-        status: 'RECEIVED',
+        fee: data.fee ? Math.round(data.fee * 100) : 0,
+        status: initialStatus,
         statusHistory: {
           create: {
-            status: 'RECEIVED',
-            note: 'Application received and under review.',
+            status: initialStatus,
+            note: initialNote,
           }
         }
       },

@@ -23,4 +23,6 @@ router.patch('/affiliates/payouts/:payoutId/process', affiliateCtrl.adminProcess
 router.get('/flight-bookings', ctrl.listFlightBookings);
 router.get('/hotel-bookings', ctrl.listHotelBookings);
 
+router.get('/payments', authenticate, requireAdmin, ctrl.getAllPayments);
+
 module.exports = router;

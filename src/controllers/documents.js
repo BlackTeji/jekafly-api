@@ -27,15 +27,34 @@ exports.upload = async (req, res, next) => {
           userId: req.user.id,
           applicationId,
           name: file.originalname,
-          key: file.key,        // S3 key from multer-s3
+          key: file.key,
           mimeType: file.mimetype,
           size: file.size,
           docIndex: docIndex != null ? parseInt(docIndex) + i : null,
         },
       })
+
     ));
 
-    // Build signed URLs for immediate preview
+    if (applicationId) {
+      const app = await prisma.application.findUnique({
+        where: { id: applicationId }
+      });
+      if (app && app.status === 'RECEIVED') {
+        await prisma.application.update({
+          where: { id: applicationId },
+          data: { status: 'PROCESSING' }
+        });
+        await prisma.statusHistory.create({
+          data: {
+            applicationId,
+            status: 'PROCESSING',
+            note: 'Documents submitted — under expert review.'
+          }
+        });
+      }
+    }
+
     const uploaded = await Promise.all(docs.map(async (doc) => ({
       id: doc.id,
       name: doc.name,
@@ -61,14 +80,12 @@ exports.list = async (req, res, next) => {
     if (req.query.ref) {
       const app = await prisma.application.findUnique({ where: { ref: req.query.ref } });
       if (app) {
-        // Admin can see all docs for any application; users only their own
         if (req.user.role !== 'ADMIN' && app.userId !== req.user.id) {
           return res.status(403).json({ ok: false, error: 'Not authorised.' });
         }
         where.applicationId = app.id;
       }
     } else {
-      // No ref — only return user's own documents
       where.userId = req.user.id;
     }
 
@@ -81,7 +98,6 @@ exports.list = async (req, res, next) => {
       prisma.document.count({ where }),
     ]);
 
-    // Return docs without pre-generating signed URLs (generated on demand via /documents/:id/url)
     const docsWithUrls = documents.map((d) => ({
       id: d.id,
       name: d.name,
