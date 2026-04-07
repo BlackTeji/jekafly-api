@@ -14,7 +14,7 @@ exports.apply = async (req, res, next) => {
             location: z.string().optional(),
             channel: z.string().optional(),
             audienceSize: z.string().optional(),
-            profileUrl: z.string().url().optional().or(z.literal('')),
+            profileUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
             motivation: z.string().optional(),
             bankAccount: z.string().min(10),
             bankName: z.string().min(2),
