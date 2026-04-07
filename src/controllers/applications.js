@@ -68,8 +68,8 @@ exports.create = async (req, res, next) => {
       include: { statusHistory: true },
     });
 
-    await emails.applicationConfirmed(app, req.user).catch(() => { });
-
+    await emails.applicationConfirmed(app, req.user, hasDocuments).catch(() => { });
+  
     res.status(201).json({ ok: true, data: { application: formatApp(app) } });
   } catch (err) { next(err); }
 };

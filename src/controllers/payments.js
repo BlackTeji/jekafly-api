@@ -12,13 +12,13 @@ exports.initiate = async (req, res, next) => {
     const schema = z.object({
       type: z.enum(['VISA', 'INSURANCE', 'CONSULTATION', 'FLIGHT', 'HOTEL']),
       ref: z.string().optional(),
-      amount: z.number().min(1),    
+      amount: z.number().min(1),
       email: z.string().email(),
       metadata: z.any().optional(),
     });
     const { type, ref, amount, email, metadata } = schema.parse(req.body);
 
-   
+
     const amountKobo = Math.round(amount * 100);
 
     let applicationId = null;
@@ -31,14 +31,14 @@ exports.initiate = async (req, res, next) => {
 
     const reference = `JKF-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
-  
+
     await prisma.payment.create({
       data: {
         userId: req.user.id,
         applicationId,
         reference,
         type,
-        amount: amountKobo,         
+        amount: amountKobo,
         status: 'INITIATED',
         metadata: metadata || {},
       },
@@ -52,7 +52,7 @@ exports.initiate = async (req, res, next) => {
     try {
       paystackData = await paystack.initializeTransaction({
         email,
-        amount: amountKobo,         
+        amount: amountKobo,
         reference,
         metadata: { userId: req.user.id, ref, type, ...metadata },
         callbackUrl: type === 'CONSULTATION'
@@ -100,7 +100,7 @@ exports.webhook = async (req, res, next) => {
 
 async function handleChargeSuccess(data) {
   const { reference, amount } = data;
-  
+
 
   const payment = await prisma.payment.findUnique({ where: { reference } });
   if (!payment || payment.status === 'SUCCESS') return;
@@ -118,32 +118,36 @@ async function handleChargeSuccess(data) {
   });
 
   if (payment.type === 'VISA' && payment.applicationId) {
-    
-    const app = await prisma.application.update({
-      where: { id: payment.applicationId },
-      data: {
-        paid: true,
-        fee: payment.amount,        
-        status: 'PROCESSING',
-        statusHistory: {
-          create: {
-            status: 'PROCESSING',
-            note: 'Payment confirmed. Application now under expert review.',
+    const [app, docCount] = await Promise.all([
+      prisma.application.update({
+        where: { id: payment.applicationId },
+        data: {
+          paid: true,
+          fee: payment.amount,
+          status: 'PROCESSING',
+          statusHistory: {
+            create: {
+              status: 'PROCESSING',
+              note: 'Payment confirmed. Application now under expert review.',
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.document.count({
+        where: { applicationId: payment.applicationId },
+      }),
+    ]);
 
     const user = await prisma.user.findUnique({
       where: { id: payment.userId },
       select: { name: true, email: true },
     });
-    if (user) await emails.paymentConfirmed(app, payment, user).catch(() => { });
+    if (user) await emails.paymentConfirmed(app, payment, user, docCount > 0).catch(() => { });
   }
 
   if (payment.type === 'INSURANCE') {
     const meta = payment.metadata || {};
-    
+
     const policy = await prisma.insurancePolicy.create({
       data: {
         userId: payment.userId,
@@ -152,7 +156,7 @@ async function handleChargeSuccess(data) {
         destination: meta.destination || meta.dest,
         travelDate: meta.date ? new Date(meta.date) : null,
         travellers: parseInt(meta.travellers) || 1,
-        amount: amount / 100,       
+        amount: amount / 100,
         status: 'active',
       },
     });
@@ -193,17 +197,17 @@ exports.verify = async (req, res, next) => {
       appRef = app?.ref;
     }
 
-    
+
     res.json({
       ok: true,
       data: {
         status: verified.status,
-        amount: verified.amount / 100, 
+        amount: verified.amount / 100,
         reference,
         ref: appRef,
         receipt: {
           txRef: reference,
-          amount: verified.amount / 100, 
+          amount: verified.amount / 100,
           paidAt: payment.paidAt || new Date(),
           metadata: payment.metadata,
         },

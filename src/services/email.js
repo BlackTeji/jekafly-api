@@ -141,28 +141,35 @@ const emails = {
     `),
   }),
 
-  applicationConfirmed: async (app, user) => sendEmail({
+  applicationConfirmed: async (app, user, hasDocuments = false) => sendEmail({
     to: user.email,
     subject: `Application Received — ${app.ref}`,
     html: layout(`
       ${badge('Application Received')}
       <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">We have your application.</h1>
-      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${user.name.split(' ')[0]}, your visa application has been received and is queued for review. Here's a summary of what was submitted.</p>
+      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${user.name.split(' ')[0]}, your visa application for <strong style="color:${NAVY};">${app.destination}</strong> has been received. Here's a summary of what was submitted.</p>
       ${infoTable(`
         ${infoRow('Reference', `<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">${app.ref}</span>`)}
         ${infoRow('Destination', app.destination)}
         ${infoRow('Visa Type', app.visaType || 'Standard')}
         ${infoRow('Travel Date', app.travelDate ? new Date(app.travelDate).toDateString() : '—')}
-        ${infoRow('Travellers', app.travellers || 1)}
+        ${infoRow('Travellers', app.travellers?.length || 1)}
+        ${infoRow('Documents', hasDocuments
+      ? '<span style="color:#16a34a;font-weight:600;">✓ Submitted with application</span>'
+      : '<span style="color:#d97706;font-weight:600;">⚠ Not yet submitted</span>'
+    )}
       `)}
-      ${alertBox('💡', '<strong>Next step:</strong> Complete your payment to activate your application and begin expert review. Applications without payment remain in draft status.')}
+      ${hasDocuments
+        ? alertBox('✅', `<strong>Documents received.</strong> Your documents have been submitted alongside your application. Our visa team will begin reviewing them once your payment is confirmed. You will receive an update at each stage of the process.`)
+        : alertBox('📎', `<strong>Action required — upload your documents.</strong> Your application has been received, but your supporting documents have not been submitted yet. Please log in to your dashboard and upload your documents as soon as possible to avoid delays in processing your application.`, '#d97706')
+      }
       <div style="text-align:center;margin:32px 0 8px;">
-        ${btn('View My Application →', `${config.frontendUrl}/dashboard.html`)}
+        ${btn(hasDocuments ? 'Complete Payment →' : 'Upload My Documents →', `${config.frontendUrl}/dashboard.html`)}
       </div>
+      ${!hasDocuments ? `<p style="margin:8px 0 0;text-align:center;font-size:12px;color:#9BA5C0;">You can upload your documents from the <strong>My Applications</strong> section of your dashboard.</p>` : ''}
     `),
   }),
-
-  paymentConfirmed: async (app, payment, user) => sendEmail({
+  paymentConfirmed: async (app, payment, user, hasDocuments = false) => sendEmail({
     to: user.email,
     subject: `Payment Confirmed — ${app?.ref || payment.reference}`,
     html: layout(`
@@ -176,12 +183,19 @@ const emails = {
         ${infoRow('Transaction ID', `<span style="font-family:monospace;font-size:13px;">${payment.reference}</span>`)}
         ${infoRow('Amount Paid', `<strong style="color:#16a34a;">₦${((payment.amount || 0) / 100).toLocaleString()}</strong>`)}
         ${infoRow('Date', new Date().toDateString())}
-        ${infoRow('Status', `<span style="color:#16a34a;font-weight:700;">● Active Review</span>`)}
+        ${infoRow('Documents', hasDocuments
+      ? '<span style="color:#16a34a;font-weight:600;">✓ Submitted</span>'
+      : '<span style="color:#d97706;font-weight:600;">⚠ Not yet submitted</span>'
+    )}
       `)}
-      ${alertBox('🎯', '<strong>What happens next?</strong> Our visa specialists will review your documents and prepare your application for embassy submission. You\'ll receive an email update at every stage. Expected processing time is <strong>3–5 business days</strong>.')}
+      ${hasDocuments
+        ? alertBox('✅', '<strong>Documents received.</strong> Your supporting documents are in. Our visa specialists will review everything and submit your application to the embassy. Expected processing time is <strong>3–5 business days</strong>. You will receive an email at every stage.')
+        : alertBox('📎', '<strong>Action required — upload your documents now.</strong> Your payment is confirmed but your supporting documents have not been submitted yet. Your application cannot proceed to embassy review until your documents are uploaded. Please log in to your dashboard and upload them as soon as possible.', '#d97706')
+      }
       <div style="text-align:center;margin:32px 0 8px;">
-        ${btn('Track My Application →', `${config.frontendUrl}/dashboard.html`)}
+        ${btn(hasDocuments ? 'Track My Application →' : 'Upload My Documents →', `${config.frontendUrl}/dashboard.html`)}
       </div>
+      ${!hasDocuments ? `<p style="margin:8px 0 0;text-align:center;font-size:12px;color:#9BA5C0;">Go to <strong>My Applications</strong> in your dashboard, select this application, and upload your documents.</p>` : ''}
     `),
   }),
 
