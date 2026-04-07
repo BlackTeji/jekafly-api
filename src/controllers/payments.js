@@ -6,7 +6,6 @@ const paystack = require('../services/paystack');
 const { emails } = require('../services/email');
 const config = require('../config');
 
-// ─── POST /payments/initiate ──────────────────────────────────────────────────
 exports.initiate = async (req, res, next) => {
   try {
     const schema = z.object({
@@ -17,7 +16,6 @@ exports.initiate = async (req, res, next) => {
       metadata: z.any().optional(),
     });
     const { type, ref, amount, email, metadata } = schema.parse(req.body);
-
 
     const amountKobo = Math.round(amount * 100);
 
@@ -30,7 +28,6 @@ exports.initiate = async (req, res, next) => {
     }
 
     const reference = `JKF-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
-
 
     await prisma.payment.create({
       data: {
@@ -76,7 +73,6 @@ exports.initiate = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── POST /payments/webhook ───────────────────────────────────────────────────
 exports.webhook = async (req, res, next) => {
   try {
     const signature = req.headers['x-paystack-signature'];
@@ -100,7 +96,6 @@ exports.webhook = async (req, res, next) => {
 
 async function handleChargeSuccess(data) {
   const { reference, amount } = data;
-
 
   const payment = await prisma.payment.findUnique({ where: { reference } });
   if (!payment || payment.status === 'SUCCESS') return;
@@ -177,7 +172,6 @@ async function handleChargeSuccess(data) {
   }
 }
 
-// ─── GET /payments/:reference/verify ─────────────────────────────────────────
 exports.verify = async (req, res, next) => {
   try {
     const { reference } = req.params;
@@ -197,7 +191,6 @@ exports.verify = async (req, res, next) => {
       appRef = app?.ref;
     }
 
-
     res.json({
       ok: true,
       data: {
@@ -216,7 +209,6 @@ exports.verify = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── GET /payments ────────────────────────────────────────────────────────────
 exports.list = async (req, res, next) => {
   try {
     const payments = await prisma.payment.findMany({

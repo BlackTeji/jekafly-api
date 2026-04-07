@@ -30,13 +30,11 @@ const sendEmail = async ({ to, subject, html, text }) => {
   }
 };
 
-// ─── Brand ────────────────────────────────────────────────────────────────────
 const LOGO_URL = 'https://jekafly.com/assets/images/JEKAFLY%20LOGO%20W-R%202.png';
 const NAVY = '#0D1560';
 const RED = '#E31E24';
 const NAVY_LIGHT = '#1C2FBF';
 
-// ─── Base layout ──────────────────────────────────────────────────────────────
 const layout = (content) => `
 <!DOCTYPE html>
 <html lang="en">
@@ -50,20 +48,14 @@ const layout = (content) => `
   <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background:#F0F2F8;padding:40px 0;">
     <tr><td align="center" style="padding:0 16px;">
       <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="max-width:580px;width:100%;">
-
-        <!-- Header -->
         <tr>
           <td style="background:linear-gradient(135deg,${NAVY} 0%,${NAVY_LIGHT} 100%);padding:32px 40px;border-radius:16px 16px 0 0;text-align:center;">
             <img src="${LOGO_URL}" alt="Jekafly" width="148" style="display:block;margin:0 auto;max-width:148px;height:auto;" />
           </td>
         </tr>
-
-        <!-- Red accent bar -->
         <tr>
           <td style="background:${RED};height:3px;line-height:3px;font-size:0;">&nbsp;</td>
         </tr>
-
-        <!-- Body -->
         <tr>
           <td style="background:#ffffff;padding:44px 40px 36px;border-radius:0 0 16px 16px;">
             ${content}
@@ -81,14 +73,12 @@ const layout = (content) => `
             </table>
           </td>
         </tr>
-
       </table>
     </td></tr>
   </table>
 </body>
 </html>`;
 
-// ─── Components ───────────────────────────────────────────────────────────────
 const btn = (text, url) =>
   `<table cellpadding="0" cellspacing="0" role="presentation" style="margin:0 auto;">
     <tr>
@@ -119,7 +109,6 @@ const alertBox = (icon, text, color = NAVY) =>
     </tr>
   </table>`;
 
-// ─── Email templates ──────────────────────────────────────────────────────────
 const emails = {
 
   welcome: async (user) => sendEmail({
@@ -142,12 +131,12 @@ const emails = {
   }),
 
   applicationConfirmed: async (app, user, hasDocuments = false) => sendEmail({
-    to: user.email,
+    to: app.email || user.email,
     subject: `Application Received — ${app.ref}`,
     html: layout(`
       ${badge('Application Received')}
       <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">We have your application.</h1>
-      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${user.name.split(' ')[0]}, your visa application for <strong style="color:${NAVY};">${app.destination}</strong> has been received. Here's a summary of what was submitted.</p>
+      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${app.applicantName?.split(' ')[0] || user.name.split(' ')[0]}, your visa application for <strong style="color:${NAVY};">${app.destination}</strong> has been received. Here's a summary of what was submitted.</p>
       ${infoTable(`
         ${infoRow('Reference', `<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">${app.ref}</span>`)}
         ${infoRow('Destination', app.destination)}
@@ -160,8 +149,8 @@ const emails = {
     )}
       `)}
       ${hasDocuments
-        ? alertBox('✅', `<strong>Documents received.</strong> Your documents have been submitted alongside your application. Our visa team will begin reviewing them once your payment is confirmed. You will receive an update at each stage of the process.`)
-        : alertBox('📎', `<strong>Action required — upload your documents.</strong> Your application has been received, but your supporting documents have not been submitted yet. Please log in to your dashboard and upload your documents as soon as possible to avoid delays in processing your application.`, '#d97706')
+        ? alertBox('✅', '<strong>Documents received.</strong> Your documents have been submitted alongside your application. Our visa team will begin reviewing them once your payment is confirmed. You will receive an update at each stage of the process.')
+        : alertBox('📎', '<strong>Action required — upload your documents.</strong> Your application has been received, but your supporting documents have not been submitted yet. Please log in to your dashboard and upload your documents as soon as possible to avoid delays in processing your application.', '#d97706')
       }
       <div style="text-align:center;margin:32px 0 8px;">
         ${btn(hasDocuments ? 'Complete Payment →' : 'Upload My Documents →', `${config.frontendUrl}/dashboard.html`)}
@@ -169,13 +158,14 @@ const emails = {
       ${!hasDocuments ? `<p style="margin:8px 0 0;text-align:center;font-size:12px;color:#9BA5C0;">You can upload your documents from the <strong>My Applications</strong> section of your dashboard.</p>` : ''}
     `),
   }),
+
   paymentConfirmed: async (app, payment, user, hasDocuments = false) => sendEmail({
-    to: user.email,
+    to: app.email || user.email,
     subject: `Payment Confirmed — ${app?.ref || payment.reference}`,
     html: layout(`
       ${badge('Payment Confirmed')}
       <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">Payment received.</h1>
-      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${user.name.split(' ')[0]}, your payment has been confirmed and your application is now <strong style="color:${NAVY};">under active review</strong> by our visa team.</p>
+      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${app.applicantName?.split(' ')[0] || user.name.split(' ')[0]}, your payment has been confirmed and your application is now <strong style="color:${NAVY};">under active review</strong> by our visa team.</p>
       ${infoTable(`
         ${infoRow('Application Ref', `<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">${app?.ref || '—'}</span>`)}
         ${infoRow('Destination', app?.destination || '—')}
@@ -224,12 +214,12 @@ const emails = {
       REJECTED: 'An update on your application.',
     };
     return sendEmail({
-      to: user.email,
+      to: app.email || user.email,
       subject: `Application Update — ${app.ref}`,
       html: layout(`
         ${badge(`Status: ${labels[app.status] || app.status}`)}
         <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">${icons[app.status] || ''} ${headings[app.status] || 'Your application has been updated.'}</h1>
-        <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${user.name.split(' ')[0]}, here is the latest update on your visa application.</p>
+        <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${app.applicantName?.split(' ')[0] || user.name.split(' ')[0]}, here is the latest update on your visa application.</p>
         ${infoTable(`
           ${infoRow('Reference', `<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">${app.ref}</span>`)}
           ${infoRow('Destination', app.destination)}
