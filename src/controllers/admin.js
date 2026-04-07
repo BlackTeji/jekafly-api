@@ -39,6 +39,7 @@ exports.listApplications = async (req, res, next) => {
       total: all.length,
       pending: all.filter(a => ['RECEIVED', 'PROCESSING', 'EMBASSY'].includes(a.status)).length,
       approved: all.filter(a => ['APPROVED', 'DELIVERED'].includes(a.status)).length,
+      
       revenue: all.filter(a => a.paid).reduce((s, a) => s + a.fee, 0) / 100,
     };
 
@@ -93,8 +94,9 @@ exports.listUsers = async (req, res, next) => {
         where, skip, take: limit,
         orderBy: { createdAt: 'desc' },
         select: {
-          id: true, name: true, email: true, phone: true, role: true, adminRole: true, createdAt: true,
-          _count: { select: { applications: true } }
+          id: true, name: true, email: true, phone: true,
+          role: true, adminRole: true, createdAt: true,
+          _count: { select: { applications: true } },
         },
       }),
       prisma.user.count({ where }),
@@ -105,7 +107,7 @@ exports.listUsers = async (req, res, next) => {
       data: {
         users: users.map(u => ({ ...u, applicationCount: u._count.applications, _count: undefined })),
         total, page, limit,
-      }
+      },
     });
   } catch (err) { next(err); }
 };
@@ -113,36 +115,85 @@ exports.listUsers = async (req, res, next) => {
 exports.updateRole = async (req, res, next) => {
   try {
     const { role } = z.object({ role: z.enum(['USER', 'ADMIN']) }).parse(req.body);
+
+    if (req.params.id === req.user.id && role === 'USER') {
+      return res.status(400).json({ ok: false, error: 'You cannot remove your own admin access.' });
+    }
+
     const user = await prisma.user.update({
       where: { id: req.params.id },
-      data: { role },
-      select: { id: true, name: true, email: true, role: true },
+      data: {
+        role,
+    
+        ...(role === 'USER' && { adminRole: null }),
+      },
+      select: { id: true, name: true, email: true, role: true, adminRole: true },
     });
     res.json({ ok: true, data: { user } });
   } catch (err) { next(err); }
 };
 
-const fmt = (app) => ({
-  ...app,
-  fee: app.fee / 100,
-  status: app.status.toLowerCase(),
-  statusHistory: (app.statusHistory || []).map(h => ({
-    status: h.status.toLowerCase(), note: h.note, date: h.createdAt,
-  })),
-});
+exports.updateAdminRole = async (req, res, next) => {
+  try {
+    const { adminRole } = z.object({
+      adminRole: z.enum(['super', 'applications', 'finance', 'consultations', 'affiliates']),
+    }).parse(req.body);
 
+    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
+    if (!target) return res.status(404).json({ ok: false, error: 'User not found.' });
+    if (target.role !== 'ADMIN') return res.status(400).json({ ok: false, error: 'User is not an admin. Set role to ADMIN first.' });
+
+    const user = await prisma.user.update({
+      where: { id: req.params.id },
+      data: { adminRole },
+      select: { id: true, name: true, email: true, role: true, adminRole: true },
+    });
+
+    res.json({ ok: true, data: { user } });
+  } catch (err) { next(err); }
+};
+
+// ─── Payments (admin view) ────────────────────────────────────────────────────
+
+exports.getAllPayments = async (req, res, next) => {
+  try {
+    const payments = await prisma.payment.findMany({
+      orderBy: { initiatedAt: 'desc' },
+      include: { user: { select: { name: true, email: true } } },
+    });
+    res.json({
+      ok: true,
+      data: {
+        payments: payments.map(p => ({
+          id: p.id,
+          type: p.type,
+          amount: p.amount / 100, 
+          status: p.status,
+          metadata: p.metadata,
+          reference: p.reference,
+          createdAt: p.initiatedAt,
+          paidAt: p.paidAt,
+          userName: p.user?.name || null,
+          email: p.user?.email || null,
+        })),
+      },
+    });
+  } catch (err) { next(err); }
+};
+
+// ─── Documents ────────────────────────────────────────────────────────────────
 exports.listDocuments = async (req, res, next) => {
   try {
     const ref = req.query.ref;
     const userId = req.query.userId;
     const where = {};
+
     if (ref) {
-      const app = await require('../utils/prisma').application.findUnique({ where: { ref } });
+      const app = await prisma.application.findUnique({ where: { ref } });
       if (app) where.applicationId = app.id;
     }
     if (userId) where.userId = userId;
 
-    const prisma = require('../utils/prisma');
     const docs = await prisma.document.findMany({
       where,
       orderBy: { uploadedAt: 'desc' },
@@ -152,23 +203,25 @@ exports.listDocuments = async (req, res, next) => {
       },
     });
 
-    const docsWithUrls = docs.map((d) => ({
-      id: d.id,
-      name: d.name,
-      mimeType: d.mimeType,
-      size: d.size,
-      ref: d.application?.ref || null,
-      uploadedBy: d.user?.name || d.user?.email || 'Unknown',
-      uploadedAt: d.uploadedAt,
-    }));
-
-    res.json({ ok: true, data: { documents: docsWithUrls } });
+    res.json({
+      ok: true,
+      data: {
+        documents: docs.map(d => ({
+          id: d.id,
+          name: d.name,
+          mimeType: d.mimeType,
+          size: d.size,
+          ref: d.application?.ref || null,
+          uploadedBy: d.user?.name || d.user?.email || 'Unknown',
+          uploadedAt: d.uploadedAt,
+        })),
+      },
+    });
   } catch (err) { next(err); }
 };
 
 exports.getApplication = async (req, res, next) => {
   try {
-    const prisma = require('../utils/prisma');
     const app = await prisma.application.findUnique({
       where: { ref: req.params.ref },
       include: {
@@ -179,14 +232,14 @@ exports.getApplication = async (req, res, next) => {
         user: { select: { name: true, email: true, phone: true } },
       },
     });
-    if (!app) throw new (require('../middleware/error').ApiError)('Application not found.', 404);
+    if (!app) throw new ApiError('Application not found.', 404);
 
     res.json({
       ok: true,
       data: {
         application: {
           ...app,
-          fee: app.fee / 100,
+          fee: app.fee / 100, 
           status: app.status.toLowerCase(),
           statusHistory: (app.statusHistory || []).map(h => ({
             status: h.status.toLowerCase(),
@@ -204,7 +257,7 @@ exports.deleteUser = async (req, res, next) => {
     const { id } = req.params;
 
     if (id === req.user.id) {
-      return res.status(400).json({ ok: false, error: 'You cannot delete your own admin account.' });
+      return res.status(400).json({ ok: false, error: 'You cannot delete your own account.' });
     }
 
     const user = await prisma.user.findUnique({ where: { id } });
@@ -236,39 +289,23 @@ exports.deleteUser = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-exports.updateAdminRole = async (req, res, next) => {
-  try {
-    const { z } = require('zod');
-    const { adminRole } = z.object({
-      adminRole: z.enum(['super', 'applications', 'finance', 'consultations', 'affiliates']),
-    }).parse(req.body);
-
-    const target = await prisma.user.findUnique({ where: { id: req.params.id } });
-    if (!target) return res.status(404).json({ ok: false, error: 'User not found.' });
-    if (target.role !== 'ADMIN') return res.status(400).json({ ok: false, error: 'User is not an admin.' });
-
-    const user = await prisma.user.update({
-      where: { id: req.params.id },
-      data: { adminRole },
-      select: { id: true, name: true, email: true, role: true, adminRole: true },
-    });
-
-    res.json({ ok: true, data: { user } });
-  } catch (err) { next(err); }
-};
+// ─── Flight & Hotel bookings ──────────────────────────────────────────────────
 
 exports.listFlightBookings = async (req, res, next) => {
   try {
-    res.json({ ok: true, data: { bookings: [], total: 0 } });
+    // TODO: replace with prisma.flightOrder.findMany() when model exists
+    res.json({ ok: true, data: { orders: [], total: 0 } });
   } catch (err) { next(err); }
 };
 
 exports.listHotelBookings = async (req, res, next) => {
   try {
-    res.json({ ok: true, data: { bookings: [], total: 0 } });
+    // TODO: replace with prisma.hotelReservation.findMany() when model exists
+    res.json({ ok: true, data: { orders: [], total: 0 } });
   } catch (err) { next(err); }
 };
 
+// ─── Document streaming & ZIP ─────────────────────────────────────────────────
 exports.streamDocument = async (req, res, next) => {
   try {
     const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
@@ -332,7 +369,7 @@ exports.downloadDocumentsZip = async (req, res, next) => {
     res.setHeader('Content-Disposition', `attachment; filename="${ref}-documents.zip"`);
     res.setHeader('Cache-Control', 'no-store');
 
-    archive.on('error', (err) => {
+    archive.on('error', () => {
       if (!res.headersSent) res.status(500).json({ ok: false, error: 'ZIP generation failed.' });
       else res.destroy();
     });
@@ -353,28 +390,12 @@ exports.downloadDocumentsZip = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-exports.getAllPayments = async (req, res, next) => {
-  try {
-    const payments = await prisma.payment.findMany({
-      orderBy: { initiatedAt: 'desc' },
-      include: { user: { select: { name: true, email: true } } },
-    });
-    res.json({
-      ok: true,
-      data: {
-        payments: payments.map(p => ({
-          id: p.id,
-          type: p.type,
-          amount: p.amount,
-          status: p.status,
-          metadata: p.metadata,
-          reference: p.reference,
-          createdAt: p.initiatedAt,
-          paidAt: p.paidAt,
-          userName: p.user?.name || null,
-          email: p.user?.email || null,
-        }))
-      }
-    });
-  } catch (err) { next(err); }
-};
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmt = (app) => ({
+  ...app,
+  fee: app.fee / 100, 
+  status: app.status.toLowerCase(),
+  statusHistory: (app.statusHistory || []).map(h => ({
+    status: h.status.toLowerCase(), note: h.note, date: h.createdAt,
+  })),
+});

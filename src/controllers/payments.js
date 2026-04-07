@@ -10,13 +10,16 @@ const config = require('../config');
 exports.initiate = async (req, res, next) => {
   try {
     const schema = z.object({
-      type: z.enum(['VISA', 'INSURANCE', 'CONSULTATION']),
+      type: z.enum(['VISA', 'INSURANCE', 'CONSULTATION', 'FLIGHT', 'HOTEL']),
       ref: z.string().optional(),
-      amount: z.number().min(1),
+      amount: z.number().min(1),    
       email: z.string().email(),
       metadata: z.any().optional(),
     });
     const { type, ref, amount, email, metadata } = schema.parse(req.body);
+
+   
+    const amountKobo = Math.round(amount * 100);
 
     let applicationId = null;
     if (ref) {
@@ -28,16 +31,17 @@ exports.initiate = async (req, res, next) => {
 
     const reference = `JKF-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
 
+  
     await prisma.payment.create({
       data: {
         userId: req.user.id,
         applicationId,
         reference,
         type,
-        amount,
+        amount: amountKobo,         
         status: 'INITIATED',
         metadata: metadata || {},
-      }
+      },
     });
 
     if (!config.paystack.secretKey) {
@@ -48,7 +52,7 @@ exports.initiate = async (req, res, next) => {
     try {
       paystackData = await paystack.initializeTransaction({
         email,
-        amount,
+        amount: amountKobo,         
         reference,
         metadata: { userId: req.user.id, ref, type, ...metadata },
         callbackUrl: type === 'CONSULTATION'
@@ -67,7 +71,7 @@ exports.initiate = async (req, res, next) => {
         accessCode: paystackData.access_code,
         reference: paystackData.reference,
         publicKey: config.paystack.publicKey,
-      }
+      },
     });
   } catch (err) { next(err); }
 };
@@ -96,6 +100,7 @@ exports.webhook = async (req, res, next) => {
 
 async function handleChargeSuccess(data) {
   const { reference, amount } = data;
+  
 
   const payment = await prisma.payment.findUnique({ where: { reference } });
   if (!payment || payment.status === 'SUCCESS') return;
@@ -113,18 +118,19 @@ async function handleChargeSuccess(data) {
   });
 
   if (payment.type === 'VISA' && payment.applicationId) {
+    
     const app = await prisma.application.update({
       where: { id: payment.applicationId },
       data: {
         paid: true,
-        fee: payment.amount,
+        fee: payment.amount,        
         status: 'PROCESSING',
         statusHistory: {
           create: {
             status: 'PROCESSING',
             note: 'Payment confirmed. Application now under expert review.',
-          }
-        }
+          },
+        },
       },
     });
 
@@ -137,17 +143,18 @@ async function handleChargeSuccess(data) {
 
   if (payment.type === 'INSURANCE') {
     const meta = payment.metadata || {};
+    
     const policy = await prisma.insurancePolicy.create({
       data: {
         userId: payment.userId,
         paymentRef: reference,
         plan: meta.plan || 'Standard',
-        destination: meta.destination,
+        destination: meta.destination || meta.dest,
         travelDate: meta.date ? new Date(meta.date) : null,
         travellers: parseInt(meta.travellers) || 1,
-        amount: amount / 100,
+        amount: amount / 100,       
         status: 'active',
-      }
+      },
     });
 
     const user = await prisma.user.findUnique({
@@ -186,20 +193,21 @@ exports.verify = async (req, res, next) => {
       appRef = app?.ref;
     }
 
+    
     res.json({
       ok: true,
       data: {
         status: verified.status,
-        amount: verified.amount / 100,
+        amount: verified.amount / 100, 
         reference,
         ref: appRef,
         receipt: {
           txRef: reference,
-          amount: verified.amount / 100,
+          amount: verified.amount / 100, 
           paidAt: payment.paidAt || new Date(),
           metadata: payment.metadata,
-        }
-      }
+        },
+      },
     });
   } catch (err) { next(err); }
 };
@@ -226,8 +234,8 @@ exports.list = async (req, res, next) => {
           ref: p.application?.ref || null,
           destination: p.application?.destination || null,
           metadata: p.metadata || {},
-        }))
-      }
+        })),
+      },
     });
   } catch (err) { next(err); }
 };

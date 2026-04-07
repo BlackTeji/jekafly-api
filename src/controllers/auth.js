@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
+const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 const { generateAccessToken, generateRefreshToken, saveRefreshToken,
@@ -7,7 +8,6 @@ const { generateAccessToken, generateRefreshToken, saveRefreshToken,
   setRefreshCookie, clearRefreshCookie } = require('../utils/jwt');
 const { emails, sendEmail } = require('../services/email');
 
-// ─── Validation schemas ───────────────────────────────────────────────────────
 const registerSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
   email: z.string().email('Invalid email address'),
@@ -20,7 +20,6 @@ const loginSchema = z.object({
   password: z.string().min(1),
 });
 
-// ─── POST /auth/register ──────────────────────────────────────────────────────
 exports.register = async (req, res, next) => {
   try {
     const { name, email, phone, password } = registerSchema.parse(req.body);
@@ -45,7 +44,6 @@ exports.register = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── POST /auth/login ─────────────────────────────────────────────────────────
 exports.login = async (req, res, next) => {
   try {
     const { email, password } = loginSchema.parse(req.body);
@@ -56,7 +54,10 @@ exports.login = async (req, res, next) => {
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new ApiError('Invalid email or password.', 401);
 
-    const safeUser = { id: user.id, name: user.name, email: user.email, phone: user.phone, role: user.role };
+    const safeUser = {
+      id: user.id, name: user.name, email: user.email,
+      phone: user.phone, role: user.role, adminRole: user.adminRole,
+    };
     const accessToken = generateAccessToken(user.id, user.role);
     const refreshToken = generateRefreshToken();
     await saveRefreshToken(user.id, refreshToken);
@@ -66,7 +67,6 @@ exports.login = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── POST /auth/refresh ───────────────────────────────────────────────────────
 exports.refresh = async (req, res, next) => {
   try {
     const token = req.cookies?.jkf_refresh;
@@ -88,7 +88,6 @@ exports.refresh = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── POST /auth/logout ────────────────────────────────────────────────────────
 exports.logout = async (req, res, next) => {
   try {
     await revokeAllRefreshTokens(req.user.id);
@@ -97,7 +96,6 @@ exports.logout = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── GET /auth/me ─────────────────────────────────────────────────────────────
 exports.me = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({
@@ -108,7 +106,6 @@ exports.me = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── PATCH /auth/me ───────────────────────────────────────────────────────────
 exports.updateMe = async (req, res, next) => {
   try {
     const schema = z.object({
@@ -126,13 +123,9 @@ exports.updateMe = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-
-// ─── In-memory OTP store (keyed by userId, expires in 10 min) ─────────────────
 const otpStore = new Map();
-
 const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 
-// ─── POST /auth/request-password-otp ──────────────────────────────────────────
 exports.requestPasswordOtp = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
@@ -158,7 +151,6 @@ exports.requestPasswordOtp = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── POST /auth/change-password ── (updated to require OTP) ───────────────────
 exports.changePassword = async (req, res, next) => {
   try {
     const schema = z.object({
@@ -192,8 +184,71 @@ exports.changePassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
+const resetOtpStore = new Map();
 
-// ─── DELETE /auth/me ── self-delete with password confirmation ────────────────
+exports.forgotPassword = async (req, res, next) => {
+  try {
+    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+
+    const user = await prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+      select: { id: true, name: true, email: true, deletedAt: true },
+    });
+
+    if (!user || user.deletedAt) {
+      return res.json({ ok: true, data: { message: 'If that email is registered, a reset code has been sent.' } });
+    }
+
+    const otp = generateOtp();
+    resetOtpStore.set(email.toLowerCase(), { otp, expiresAt: Date.now() + 15 * 60 * 1000, userId: user.id });
+
+    await sendEmail({
+      to: user.email,
+      subject: 'Reset your Jekafly password',
+      html: `
+        <div style="font-family:'Plus Jakarta Sans',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#f7f8fc;border-radius:16px;">
+          <img src="https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png" style="height:36px;margin-bottom:24px;" />
+          <h2 style="color:#0a1f44;font-size:1.4rem;margin-bottom:8px;">Reset Your Password</h2>
+          <p style="color:#6b7280;font-size:0.9rem;margin-bottom:24px;">Use the code below to reset your password. It expires in <strong>15 minutes</strong>.</p>
+          <div style="background:#0a1f44;color:#fff;font-size:2rem;font-weight:800;letter-spacing:.3em;text-align:center;padding:20px;border-radius:12px;margin-bottom:24px;">${otp}</div>
+          <p style="color:#9ca3af;font-size:0.78rem;">If you did not request this, you can safely ignore this email.</p>
+        </div>`,
+    }).catch(err => {
+      if (process.env.NODE_ENV !== 'production') console.log(`[DEV] Reset OTP for ${email}: ${otp}`);
+    });
+
+    res.json({ ok: true, data: { message: 'If that email is registered, a reset code has been sent.' } });
+  } catch (err) { next(err); }
+};
+
+exports.resetPassword = async (req, res, next) => {
+  try {
+    const { email, otp, newPassword } = z.object({
+      email: z.string().email(),
+      otp: z.string().length(6),
+      newPassword: z.string().min(8),
+    }).parse(req.body);
+
+    const record = resetOtpStore.get(email.toLowerCase());
+
+    if (!record || record.otp !== otp || Date.now() > record.expiresAt) {
+      return res.status(400).json({ ok: false, error: 'Invalid or expired reset code.' });
+    }
+
+    resetOtpStore.delete(email.toLowerCase());
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: record.userId },
+      data: { passwordHash: hash },
+    });
+
+    await prisma.refreshToken.deleteMany({ where: { userId: record.userId } });
+
+    res.json({ ok: true, data: { message: 'Password reset successfully. Please log in with your new password.' } });
+  } catch (err) { next(err); }
+};
+
 exports.deleteAccount = async (req, res, next) => {
   try {
     const schema = z.object({ password: z.string().min(1) });
@@ -226,7 +281,6 @@ exports.deleteAccount = async (req, res, next) => {
     await prisma.refreshToken.deleteMany({ where: { userId: req.user.id } });
     clearRefreshCookie(res);
 
-    const { sendEmail } = require('../services/email');
     await sendEmail({
       to: user.email,
       subject: 'Your Jekafly account has been deleted',

@@ -2,207 +2,181 @@ const { z } = require('zod');
 const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
-const { emails } = require('../services/email');
 
-// ── Helpers ────────────────────────────────────────────────────────────────────
-const generateCode = (name) => {
-    const base = name.replace(/[^a-zA-Z]/g, '').toUpperCase().slice(0, 5);
-    const rand = crypto.randomBytes(3).toString('hex').toUpperCase();
-    return `${base}${rand}`;
-};
-
-const fmtAffiliate = (a) => ({
-    ...a,
-    totalEarned: a.totalEarned / 100,
-    totalPaid: a.totalPaid / 100,
-    balance: a.balance / 100,
-    payouts: (a.payouts || []).map(p => ({
-        ...p,
-        amount: p.amount / 100,
-    })),
-});
-
-const applySchema = z.object({
-    name: z.string().min(2),
-    email: z.string().email(),
-    phone: z.string().min(7),
-    location: z.string().optional(),
-    channel: z.string().optional(),
-    audienceSize: z.string().optional(),
-    profileUrl: z.string().url().optional().or(z.literal('')).or(z.null()),
-    motivation: z.string().optional().or(z.null()),
-    bankAccount: z.string().length(10).regex(/^\d+$/, 'Must be 10 digits'),
-    bankName: z.string().min(2),
-    accountName: z.string().min(2),
-});
-
-// ── POST /affiliates/apply ─────────────────────────────────────────────────────
+// ─── POST /affiliates/apply ───────────────────────────────────────────────────
 exports.apply = async (req, res, next) => {
     try {
-        const data = applySchema.parse(req.body);
+        const schema = z.object({
+            name: z.string().min(2),
+            email: z.string().email(),
+            phone: z.string().min(7),
+            location: z.string().optional(),
+            channel: z.string().optional(),
+            audienceSize: z.string().optional(),
+            profileUrl: z.string().url().optional().or(z.literal('')),
+            motivation: z.string().optional(),
+            bankAccount: z.string().min(10),
+            bankName: z.string().min(2),
+            accountName: z.string().min(2),
+        });
+
+        const data = schema.parse(req.body);
 
         const existing = await prisma.affiliate.findUnique({ where: { email: data.email } });
         if (existing) {
-            return res.status(409).json({
-                ok: false,
-                error: existing.status === 'REJECTED'
-                    ? 'A previous application with this email was rejected. Please contact us to reapply.'
-                    : 'An application with this email already exists.',
-            });
+            return res.status(409).json({ ok: false, error: 'An application with this email already exists.' });
         }
 
-        let code = generateCode(data.name);
-        let attempts = 0;
-        while (await prisma.affiliate.findUnique({ where: { referralCode: code } })) {
-            code = generateCode(data.name + attempts++);
-        }
+        const referralCode = 'JKF-' + crypto.randomBytes(4).toString('hex').toUpperCase();
 
         const affiliate = await prisma.affiliate.create({
             data: {
                 ...data,
                 profileUrl: data.profileUrl || null,
-                motivation: data.motivation || null,
+                referralCode,
                 userId: req.user?.id || null,
-                referralCode: code,
-                status: 'PENDING',
             },
         });
 
-        emails.affiliateApplicationReceived(affiliate).catch(() => { });
-
-        res.status(201).json({
-            ok: true,
-            data: { affiliate: fmtAffiliate(affiliate) },
-        });
+        res.status(201).json({ ok: true, data: { affiliate } });
     } catch (err) { next(err); }
 };
 
-// ── GET /affiliates/me ─────────────────────────────────────────────────────────
+// ─── GET /affiliates/me ───────────────────────────────────────────────────────
 exports.getMe = async (req, res, next) => {
     try {
-        const user = req.user;
         const affiliate = await prisma.affiliate.findFirst({
-            where: {
-                OR: [
-                    { userId: user.id },
-                    { email: user.email },
-                ],
-            },
-            include: { payouts: { orderBy: { requestedAt: 'desc' } } },
+            where: { userId: req.user.id },
         });
+        if (!affiliate) throw new ApiError('Affiliate profile not found.', 404);
 
-        if (!affiliate) {
-            return res.json({ ok: true, data: null });
-        }
-
-        const stats = {
-            clicks: affiliate.totalClicks,
-            conversions: affiliate.totalReferrals,
-            totalEarned: affiliate.totalEarned / 100,
-            pendingPayout: affiliate.balance / 100,
-        };
-
-        res.json({
-            ok: true,
-            data: {
-                affiliate: fmtAffiliate(affiliate),
-                stats,
-            },
-        });
+        res.json({ ok: true, data: { affiliate: fmtAffiliate(affiliate) } });
     } catch (err) { next(err); }
 };
 
-// ── GET /affiliates/stats ──────────────────────────────────────────────────────
+// ─── GET /affiliates/stats ────────────────────────────────────────────────────
 exports.getStats = async (req, res, next) => {
     try {
-        const user = req.user;
         const affiliate = await prisma.affiliate.findFirst({
-            where: { OR: [{ userId: user.id }, { email: user.email }] },
+            where: { userId: req.user.id },
+            include: { payouts: { orderBy: { requestedAt: 'desc' }, take: 10 } },
         });
-        if (!affiliate) return res.json({ ok: true, data: { clicks: 0, conversions: 0, totalEarned: 0, pendingPayout: 0 } });
+        if (!affiliate) throw new ApiError('Affiliate profile not found.', 404);
 
         res.json({
             ok: true,
             data: {
-                clicks: affiliate.totalClicks,
-                conversions: affiliate.totalReferrals,
-                totalEarned: affiliate.totalEarned / 100,
-                pendingPayout: affiliate.balance / 100,
+                referralCode: affiliate.referralCode,
+                totalClicks: affiliate.totalClicks,
+                totalReferrals: affiliate.totalReferrals,
+                totalEarned: affiliate.totalEarned / 100,   // kobo → naira
+                totalPaid: affiliate.totalPaid / 100,
+                balance: affiliate.balance / 100,
+                payouts: affiliate.payouts.map(fmtPayout),
             },
         });
     } catch (err) { next(err); }
 };
 
-// ── GET /affiliates/payouts ────────────────────────────────────────────────────
+// ─── GET /affiliates/payouts ──────────────────────────────────────────────────
 exports.getPayouts = async (req, res, next) => {
     try {
-        const user = req.user;
-        const affiliate = await prisma.affiliate.findFirst({
-            where: { OR: [{ userId: user.id }, { email: user.email }] },
-            include: { payouts: { orderBy: { requestedAt: 'desc' } } },
-        });
-        if (!affiliate) return res.json({ ok: true, data: { payouts: [] } });
+        const affiliate = await prisma.affiliate.findFirst({ where: { userId: req.user.id } });
+        if (!affiliate) throw new ApiError('Affiliate profile not found.', 404);
 
-        const payouts = affiliate.payouts.map(p => ({ ...p, amount: p.amount / 100 }));
-        res.json({ ok: true, data: { payouts } });
+        const payouts = await prisma.affiliatePayout.findMany({
+            where: { affiliateId: affiliate.id },
+            orderBy: { requestedAt: 'desc' },
+        });
+
+        res.json({ ok: true, data: { payouts: payouts.map(fmtPayout) } });
     } catch (err) { next(err); }
 };
 
-// ── POST /affiliates/payouts/request ──────────────────────────────────────────
+// ─── POST /affiliates/payouts/request ────────────────────────────────────────
 exports.requestPayout = async (req, res, next) => {
     try {
-        const { amount } = z.object({ amount: z.number().min(100) }).parse(req.body);
+        const schema = z.object({
+            amount: z.number().min(1000),
+            bankDetails: z.object({
+                bankName: z.string().min(2),
+                accountNumber: z.string().min(10),
+                accountName: z.string().min(2),
+            }),
+        });
+
+        const { amount, bankDetails } = schema.parse(req.body);
         const amountKobo = Math.round(amount * 100);
 
-        const user = req.user;
-        const affiliate = await prisma.affiliate.findFirst({
-            where: { OR: [{ userId: user.id }, { email: user.email }] },
-        });
-        if (!affiliate) throw new ApiError('Affiliate account not found.', 404);
-        if (affiliate.status !== 'APPROVED') throw new ApiError('Your affiliate account is not yet approved.', 403);
+        const affiliate = await prisma.affiliate.findFirst({ where: { userId: req.user.id } });
+        if (!affiliate) throw new ApiError('Affiliate profile not found.', 404);
+        if (affiliate.status !== 'APPROVED') throw new ApiError('Your affiliate application is not yet approved.', 403);
         if (affiliate.balance < amountKobo) throw new ApiError('Insufficient balance.', 400);
 
         const payout = await prisma.affiliatePayout.create({
             data: {
                 affiliateId: affiliate.id,
                 amount: amountKobo,
-                bankName: affiliate.bankName,
-                accountNumber: affiliate.bankAccount,
-                accountName: affiliate.accountName,
+                bankName: bankDetails.bankName,
+                accountNumber: bankDetails.accountNumber,
+                accountName: bankDetails.accountName,
                 status: 'PENDING',
             },
         });
 
-        await prisma.affiliate.update({
-            where: { id: affiliate.id },
-            data: { balance: { decrement: amountKobo } },
-        });
-
-        res.status(201).json({ ok: true, data: { payout: { ...payout, amount: payout.amount / 100 } } });
+        res.status(201).json({ ok: true, data: { payout: fmtPayout(payout) } });
     } catch (err) { next(err); }
 };
 
-// ── GET /admin/affiliates ──────────────────────────────────────────────────────
+// ─── GET /admin/affiliates ────────────────────────────────────────────────────
 exports.adminList = async (req, res, next) => {
     try {
-        const status = req.query.status?.toUpperCase();
-        const where = status ? { status } : {};
-
         const affiliates = await prisma.affiliate.findMany({
-            where,
             orderBy: { createdAt: 'desc' },
-            include: { payouts: { orderBy: { requestedAt: 'desc' } } },
+            include: {
+                payouts: {
+                    where: { status: 'PENDING' },
+                    orderBy: { requestedAt: 'desc' },
+                },
+            },
         });
 
-        res.json({ ok: true, data: { affiliates: affiliates.map(fmtAffiliate) } });
+        res.json({
+            ok: true,
+            data: {
+                affiliates: affiliates.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    email: a.email,
+                    phone: a.phone,
+                    location: a.location,
+                    channel: a.channel,
+                    audienceSize: a.audienceSize,
+                    profileUrl: a.profileUrl,
+                    motivation: a.motivation,
+                    bankAccount: a.bankAccount,
+                    bankName: a.bankName,
+                    accountName: a.accountName,
+                    referralCode: a.referralCode,
+                    status: a.status.toLowerCase(),
+                    totalClicks: a.totalClicks,
+                    totalReferrals: a.totalReferrals,
+                    totalEarned: a.totalEarned / 100,
+                    totalPaid: a.totalPaid / 100,
+                    balance: a.balance / 100,
+                    pendingPayouts: a.payouts.map(fmtPayout),
+                    createdAt: a.createdAt,
+                })),
+            },
+        });
     } catch (err) { next(err); }
 };
 
-// ── PATCH /admin/affiliates/:id/status ────────────────────────────────────────
+// ─── PATCH /admin/affiliates/:id/status ──────────────────────────────────────
 exports.adminUpdateStatus = async (req, res, next) => {
     try {
         const { status } = z.object({
-            status: z.enum(['APPROVED', 'REJECTED']),
+            status: z.enum(['APPROVED', 'REJECTED', 'PENDING']),
         }).parse(req.body);
 
         const affiliate = await prisma.affiliate.findUnique({ where: { id: req.params.id } });
@@ -213,17 +187,11 @@ exports.adminUpdateStatus = async (req, res, next) => {
             data: { status },
         });
 
-        if (status === 'APPROVED') {
-            emails.affiliateApproved(updated).catch(() => { });
-        } else {
-            emails.affiliateRejected(updated).catch(() => { });
-        }
-
-        res.json({ ok: true, data: { affiliate: fmtAffiliate(updated) } });
+        res.json({ ok: true, data: { affiliate: { id: updated.id, status: updated.status.toLowerCase() } } });
     } catch (err) { next(err); }
 };
 
-// ── PATCH /admin/affiliates/payouts/:payoutId/process ─────────────────────────
+// ─── PATCH /admin/affiliates/payouts/:payoutId/process ───────────────────────
 exports.adminProcessPayout = async (req, res, next) => {
     try {
         const payout = await prisma.affiliatePayout.findUnique({
@@ -233,19 +201,48 @@ exports.adminProcessPayout = async (req, res, next) => {
         if (!payout) throw new ApiError('Payout not found.', 404);
         if (payout.status === 'PROCESSED') throw new ApiError('Payout already processed.', 400);
 
-        const updated = await prisma.affiliatePayout.update({
-            where: { id: payout.id },
-            data: {
-                status: 'PROCESSED',
-                processedAt: new Date(),
-            },
-        });
+        await prisma.$transaction([
+            prisma.affiliatePayout.update({
+                where: { id: payout.id },
+                data: { status: 'PROCESSED', processedAt: new Date() },
+            }),
+            prisma.affiliate.update({
+                where: { id: payout.affiliateId },
+                data: {
+                    totalPaid: { increment: payout.amount },
+                    balance: { decrement: payout.amount },
+                },
+            }),
+        ]);
 
-        await prisma.affiliate.update({
-            where: { id: payout.affiliateId },
-            data: { totalPaid: { increment: payout.amount } },
-        });
-
-        res.json({ ok: true, data: { payout: { ...updated, amount: updated.amount / 100 } } });
+        res.json({ ok: true, data: { message: 'Payout marked as processed.' } });
     } catch (err) { next(err); }
 };
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+const fmtAffiliate = (a) => ({
+    id: a.id,
+    name: a.name,
+    email: a.email,
+    phone: a.phone,
+    referralCode: a.referralCode,
+    status: a.status.toLowerCase(),
+    totalClicks: a.totalClicks,
+    totalReferrals: a.totalReferrals,
+    totalEarned: a.totalEarned / 100,
+    totalPaid: a.totalPaid / 100,
+    balance: a.balance / 100,
+    createdAt: a.createdAt,
+});
+
+const fmtPayout = (p) => ({
+    id: p.id,
+    amount: p.amount / 100,
+    status: p.status.toLowerCase(),
+    bankName: p.bankName,
+    accountNumber: p.accountNumber,
+    accountName: p.accountName,
+    note: p.note,
+    requestedAt: p.requestedAt,
+    processedAt: p.processedAt,
+});
