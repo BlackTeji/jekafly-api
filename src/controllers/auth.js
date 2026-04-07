@@ -295,3 +295,22 @@ exports.deleteAccount = async (req, res, next) => {
     res.json({ ok: true, data: { message: 'Account deleted.' } });
   } catch (err) { next(err); }
 };
+
+// ─── POST /auth/set-password ──────────────────────────────────────────────────
+exports.setPassword = async (req, res, next) => {
+  try {
+    const { z } = require('zod');
+    const bcrypt = require('bcryptjs');
+    const { newPassword } = z.object({
+      newPassword: z.string().min(8),
+    }).parse(req.body);
+
+    const hash = await bcrypt.hash(newPassword, 12);
+    await prisma.user.update({
+      where: { id: req.user.id },
+      data: { passwordHash: hash },
+    });
+
+    res.json({ ok: true, data: { message: 'Password set successfully.' } });
+  } catch (err) { next(err); }
+};
