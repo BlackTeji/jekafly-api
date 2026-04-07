@@ -5,16 +5,42 @@ const notFound = (req, res, next) => {
 };
 
 const errorHandler = (err, req, res, next) => {
-  // Zod validation error
   if (err.name === 'ZodError') {
+    const details = err.errors.map(e => `${e.path.join('.')}: ${e.message}`);
+    const first = err.errors[0];
+    const field = first.path.length ? first.path[first.path.length - 1] : null;
+
+    const fieldLabels = {
+      name: 'Full name',
+      email: 'Email address',
+      phone: 'Phone number',
+      location: 'Location',
+      channel: 'Promotion channel',
+      audienceSize: 'Audience size',
+      profileUrl: 'Profile URL',
+      bankAccount: 'Bank account number',
+      bankName: 'Bank name',
+      accountName: 'Account name',
+      motivation: 'Motivation',
+      password: 'Password',
+      newPassword: 'New password',
+      currentPassword: 'Current password',
+      otp: 'OTP code',
+      amount: 'Amount',
+    };
+
+    const label = field && fieldLabels[field] ? fieldLabels[field] : field;
+    const humanMessage = label
+      ? `${label}: ${first.message}`
+      : first.message;
+
     return res.status(400).json({
       ok: false,
-      error: 'Validation failed',
-      details: err.errors.map(e => `${e.path.join('.')}: ${e.message}`),
+      error: humanMessage,
+      details,
     });
   }
 
-  // Prisma unique constraint
   if (err.code === 'P2002') {
     return res.status(409).json({
       ok: false,
@@ -22,12 +48,10 @@ const errorHandler = (err, req, res, next) => {
     });
   }
 
-  // Prisma not found
   if (err.code === 'P2025') {
     return res.status(404).json({ ok: false, error: 'Record not found.' });
   }
 
-  // JWT errors
   if (err.name === 'JsonWebTokenError') {
     return res.status(401).json({ ok: false, error: 'Invalid token.' });
   }
@@ -43,7 +67,6 @@ const errorHandler = (err, req, res, next) => {
   res.status(statusCode).json({ ok: false, error: message });
 };
 
-// Helper to create typed API errors
 class ApiError extends Error {
   constructor(message, statusCode = 400) {
     super(message);
