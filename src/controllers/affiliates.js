@@ -215,7 +215,7 @@ exports.magicLogin = async (req, res, next) => {
 // ─── Internal: create account + magic link on affiliate approval ──────────────
 async function issueAffiliateAccount(affiliateId) {
     const bcrypt = require('bcryptjs');
-    const { sendEmail } = require('../services/email');
+    const { emails } = require('../services/email');
     const config = require('../config');
 
     const affiliate = await prisma.affiliate.findUnique({ where: { id: affiliateId } });
@@ -242,29 +242,9 @@ async function issueAffiliateAccount(affiliateId) {
 
     const token = crypto.randomBytes(32).toString('hex');
     magicTokenStore.set(token, { userId: user.id, expiresAt: Date.now() + 72 * 60 * 60 * 1000 });
-
     const magicUrl = `${config.frontendUrl}/dashboard.html?magic=${token}`;
-    const firstName = affiliate.name.split(' ')[0];
 
-    await sendEmail({
-        to: affiliate.email,
-        subject: 'You have been approved as a Jekafly Affiliate!',
-        html: `<div style="font-family:'Poppins',sans-serif;max-width:520px;margin:0 auto;background:#fff;border-radius:20px;overflow:hidden;box-shadow:0 8px 40px rgba(13,21,96,0.12);">
-            <div style="background:linear-gradient(135deg,#0D1560,#1C2FBF);padding:36px 32px;text-align:center;">
-                <img src="https://jekafly.com/assets/images/JEKAFLY%20LOGO%20W-R%202.png" style="height:38px;margin-bottom:16px;" alt="Jekafly" />
-                <div style="background:rgba(255,255,255,0.15);border-radius:100px;display:inline-block;padding:8px 20px;font-size:0.82rem;font-weight:700;color:#fff;letter-spacing:0.05em;">AFFILIATE APPROVED</div>
-            </div>
-            <div style="padding:36px 32px;">
-                <h2 style="color:#0D1560;font-size:1.4rem;font-weight:800;letter-spacing:-0.03em;margin:0 0 10px;">Welcome to the family, ${firstName}!</h2>
-                <p style="color:#6B7280;font-size:0.9rem;line-height:1.7;margin-bottom:28px;">Your affiliate application has been approved. Click below to access your dashboard, get your unique referral link, and start earning.</p>
-                <a href="${magicUrl}" style="display:block;text-align:center;padding:16px 28px;background:linear-gradient(135deg,#0D1560,#1C2FBF);color:#fff;border-radius:14px;font-size:1rem;font-weight:700;text-decoration:none;letter-spacing:-0.01em;box-shadow:0 6px 20px rgba(13,21,96,0.28);margin-bottom:16px;">Access My Affiliate Dashboard &rarr;</a>
-                <p style="color:#9CA3AF;font-size:0.78rem;text-align:center;line-height:1.6;">This link expires in 72 hours. After that, simply log in at <a href="https://jekafly.com" style="color:#0D1560;">jekafly.com</a> with your email address.</p>
-            </div>
-            <div style="background:#F8F9FE;padding:20px 32px;border-top:1px solid #EEF0F8;">
-                <p style="color:#9CA3AF;font-size:0.76rem;margin:0;text-align:center;">Questions? Contact us at <a href="mailto:support@jekafly.com" style="color:#0D1560;">support@jekafly.com</a></p>
-            </div>
-        </div>`,
-    });
+    await emails.affiliateApproved(affiliate, magicUrl);
 }
 
 const fmtAffiliate = (a) => ({
