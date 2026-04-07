@@ -34,6 +34,7 @@ const reviewRoutes = require('./routes/reviews');
 const affiliateRoutes = require('./routes/affiliates');
 const flightRoutes = require('./routes/flights');
 const hotelRoutes = require('./routes/hotels');
+const bankRoutes = require('./routes/bank');
 
 const app = express();
 app.set('trust proxy', 1);
@@ -102,6 +103,7 @@ app.use('/api/v1/reviews', reviewRoutes);
 app.use('/api/v1/affiliates', affiliateRoutes);
 app.use('/api/v1/flights', flightRoutes);
 app.use('/api/v1/hotels', hotelRoutes);
+app.use('/api/v1/bank', bankRoutes);
 
 app.use(notFound);
 app.use(errorHandler);
