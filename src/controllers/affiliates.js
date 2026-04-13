@@ -151,7 +151,6 @@ exports.adminUpdateStatus = async (req, res, next) => {
             data: { status },
         });
 
-        // On approval: create account + send magic link email
         if (status === 'APPROVED') {
             issueAffiliateAccount(updated.id).catch(err => {
                 console.error('[Affiliate] Account provisioning failed:', err.message);
@@ -242,7 +241,7 @@ async function issueAffiliateAccount(affiliateId) {
 
     const token = crypto.randomBytes(32).toString('hex');
     magicTokenStore.set(token, { userId: user.id, expiresAt: Date.now() + 72 * 60 * 60 * 1000 });
-    const magicUrl = `${config.frontendUrl}/dashboard.html?magic=${token}`;
+    const magicUrl = `${config.frontendUrl}/affiliate-dashboard.html?magic=${token}`;
 
     await emails.affiliateApproved(affiliate, magicUrl);
 }

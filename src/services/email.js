@@ -291,26 +291,31 @@ const emails = {
     `),
   }),
 
-  affiliateApproved: async (affiliate, magicUrl) => sendEmail({
-    to: affiliate.email,
-    subject: 'You are now a Jekafly Affiliate — Welcome aboard',
-    html: layout(`
-      ${badge('Affiliate Approved')}
-      <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">Welcome to the Jekafly Affiliate Programme.</h1>
-      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${affiliate.name.split(' ')[0]}, your application has been reviewed and approved. You can now start earning commissions by referring clients to Jekafly.</p>
-      ${infoTable(`
-        ${infoRow('Your Referral Code', `<strong style="font-size:15px;letter-spacing:0.12em;color:${NAVY};font-family:monospace;">${affiliate.referralCode}</strong>`)}
-        ${infoRow('Your Referral Link', `<a href="${config.frontendUrl}/?ref=${affiliate.referralCode}" style="color:${RED};font-weight:600;word-break:break-all;">${config.frontendUrl}/?ref=${affiliate.referralCode}</a>`)}
-        ${infoRow('Commission Tier', 'Starter — 8% per successful referral')}
-        ${infoRow('Payout Schedule', 'Weekly, every Friday')}
-      `)}
-      ${alertBox('🎯', '<strong>How to earn:</strong> Share your referral link across your channels. Every client who applies through your link and completes a paid visa application earns you a commission. Your tier upgrades automatically as your referrals grow.')}
-      <div style="text-align:center;margin:32px 0 16px;">
-        ${btn('Access My Dashboard →', magicUrl)}
-      </div>
-      <p style="margin:0;text-align:center;font-size:12px;color:#9BA5C0;line-height:1.6;">This access link expires in <strong>72 hours</strong>. After that, log in at <a href="${config.frontendUrl}" style="color:${NAVY};font-weight:600;text-decoration:none;">jekafly.com</a> using your email address.</p>
-    `),
-  }),
+  affiliateApproved: async (affiliate, magicUrl) => {
+    const affiliateUrl = magicUrl
+      ? magicUrl.replace('/dashboard.html', '/affiliate-dashboard.html')
+      : `${config.frontendUrl}/affiliate-dashboard.html`;
+    return sendEmail({
+      to: affiliate.email,
+      subject: 'You are now a Jekafly Affiliate — Welcome aboard',
+      html: layout(`
+        ${badge('Affiliate Approved')}
+        <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">Welcome to the Jekafly Affiliate Programme.</h1>
+        <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${affiliate.name.split(' ')[0]}, your application has been reviewed and approved. You can now start earning commissions by referring clients to Jekafly.</p>
+        ${infoTable(`
+          ${infoRow('Your Referral Code', `<strong style="font-size:15px;letter-spacing:0.12em;color:${NAVY};font-family:monospace;">${affiliate.referralCode}</strong>`)}
+          ${infoRow('Your Referral Link', `<a href="${config.frontendUrl}/?ref=${affiliate.referralCode}" style="color:${RED};font-weight:600;word-break:break-all;">${config.frontendUrl}/?ref=${affiliate.referralCode}</a>`)}
+          ${infoRow('Commission Tier', 'Starter — 8% per successful referral')}
+          ${infoRow('Payout Schedule', 'Weekly, every Friday')}
+        `)}
+        ${alertBox('🎯', '<strong>How to earn:</strong> Share your referral link across your channels. Every client who applies through your link and completes a paid visa application earns you a commission. Your tier upgrades automatically as your referrals grow.')}
+        <div style="text-align:center;margin:32px 0 16px;">
+          ${btn('Go to My Affiliate Dashboard →', affiliateUrl)}
+        </div>
+        <p style="margin:0;text-align:center;font-size:12px;color:#9BA5C0;line-height:1.6;">This access link expires in <strong>72 hours</strong>. After that, log in at <a href="${config.frontendUrl}/affiliate-dashboard.html" style="color:${NAVY};font-weight:600;text-decoration:none;">jekafly.com/affiliate-dashboard</a> using your email address.</p>
+      `),
+    });
+  },
 
   affiliateRejected: async (affiliate) => sendEmail({
     to: affiliate.email,

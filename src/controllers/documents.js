@@ -1,7 +1,7 @@
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 const { getSignedDownloadUrl, deleteFile } = require('../services/storage');
-const { sendEmail } = require('../utils/email');
+const { sendEmail } = require('../services/email');
 const config = require('../config');
 
 // ─── POST /documents/upload ───────────────────────────────────────────────────
