@@ -21,6 +21,8 @@ const appSchema = z.object({
   travellers: z.array(z.any()).optional(),
   feeBreakdown: z.any().optional(),
   fee: z.number().optional(),
+  referralCode: z.string().optional(),
+  agentSubmitted: z.boolean().optional(),
 });
 
 const toDate = (s) => s ? new Date(s) : undefined;
@@ -30,6 +32,15 @@ exports.create = async (req, res, next) => {
   try {
     const data = appSchema.parse(req.body);
     const ref = await generateRef();
+
+    if (data.referralCode) {
+      const affiliate = await prisma.affiliate.findUnique({
+        where: { referralCode: data.referralCode },
+      });
+      if (!affiliate || affiliate.status !== 'APPROVED') {
+        throw new ApiError('Invalid or inactive referral code.', 400);
+      }
+    }
 
     const hasDocuments = !!req.body.hasDocuments;
     const initialStatus = hasDocuments ? 'PROCESSING' : 'RECEIVED';
@@ -57,19 +68,21 @@ exports.create = async (req, res, next) => {
         travellers: data.travellers || [],
         feeBreakdown: data.feeBreakdown,
         fee: data.fee ? Math.round(data.fee * 100) : 0,
+        referralCode: data.referralCode || null,
+        agentSubmitted: data.agentSubmitted || false,
         status: initialStatus,
         statusHistory: {
           create: {
             status: initialStatus,
             note: initialNote,
-          }
-        }
+          },
+        },
       },
       include: { statusHistory: true },
     });
 
     await emails.applicationConfirmed(app, req.user, hasDocuments).catch(() => { });
-  
+
     res.status(201).json({ ok: true, data: { application: formatApp(app) } });
   } catch (err) { next(err); }
 };
@@ -108,7 +121,6 @@ exports.getOne = async (req, res, next) => {
     });
     if (!app) throw new ApiError('Application not found.', 404);
 
-    // Users can only see their own; admins see all
     if (req.user.role !== 'ADMIN' && app.userId !== req.user.id) {
       throw new ApiError('Application not found.', 404);
     }
@@ -126,7 +138,6 @@ exports.track = async (req, res, next) => {
     });
     if (!app) throw new ApiError('No application found with that reference.', 404);
 
-    // Return limited fields only — no personal data
     res.json({
       ok: true,
       data: {
@@ -138,7 +149,7 @@ exports.track = async (req, res, next) => {
           note: h.note,
           date: h.createdAt,
         })),
-      }
+      },
     });
   } catch (err) { next(err); }
 };
@@ -146,7 +157,7 @@ exports.track = async (req, res, next) => {
 // ─── Format helper ────────────────────────────────────────────────────────────
 const formatApp = (app) => ({
   ...app,
-  fee: app.fee / 100, // return in naira
+  fee: app.fee / 100,
   status: app.status.toLowerCase(),
   statusHistory: (app.statusHistory || []).map(h => ({
     status: h.status.toLowerCase(),

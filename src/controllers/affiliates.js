@@ -207,7 +207,15 @@ exports.magicLogin = async (req, res, next) => {
         await saveRefreshToken(user.id, refreshToken);
         setRefreshCookie(res, refreshToken);
 
-        res.json({ ok: true, data: { user, accessToken, mustSetPassword: true } });
+        res.json({
+            ok: true,
+            data: {
+                user,
+                accessToken,
+                mustSetPassword: record.isNewUser,
+                isNewUser: record.isNewUser,
+            },
+        });
     } catch (err) { next(err); }
 };
 
@@ -221,6 +229,7 @@ async function issueAffiliateAccount(affiliateId) {
     if (!affiliate) return;
 
     let user = await prisma.user.findUnique({ where: { email: affiliate.email } });
+    const isNewUser = !user;
     if (!user) {
         const tempHash = await bcrypt.hash(crypto.randomBytes(32).toString('hex'), 12);
         user = await prisma.user.create({
@@ -240,7 +249,7 @@ async function issueAffiliateAccount(affiliateId) {
     });
 
     const token = crypto.randomBytes(32).toString('hex');
-    magicTokenStore.set(token, { userId: user.id, expiresAt: Date.now() + 72 * 60 * 60 * 1000 });
+    magicTokenStore.set(token, { userId: user.id, expiresAt: Date.now() + 72 * 60 * 60 * 1000, isNewUser });
     const magicUrl = `${config.frontendUrl}/affiliate-dashboard.html?magic=${token}`;
 
     await emails.affiliateApproved(affiliate, magicUrl);

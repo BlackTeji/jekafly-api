@@ -138,6 +138,10 @@ async function handleChargeSuccess(data) {
       select: { name: true, email: true },
     });
     if (user) await emails.paymentConfirmed(app, payment, user, docCount > 0).catch(() => { });
+
+    await creditAffiliateCommission(app, payment.amount).catch((err) => {
+      console.error('[Affiliate Commission Error]', err.message);
+    });
   }
 
   if (payment.type === 'INSURANCE') {
@@ -170,6 +174,47 @@ async function handleChargeSuccess(data) {
     });
     if (user) await emails.consultationBooked(user).catch(() => { });
   }
+}
+
+// ─── Affiliate commission credit ──────────────────────────────────────────────
+// Rate: 8% of payment amount (kobo in, kobo out)
+// Self-referral guard: blocked if the applicant's passport number matches
+// any previous application submitted by the affiliate themselves.
+async function creditAffiliateCommission(app, amountKobo) {
+  if (!app.referralCode) return;
+
+  const affiliate = await prisma.affiliate.findUnique({
+    where: { referralCode: app.referralCode },
+  });
+  if (!affiliate || affiliate.status !== 'APPROVED') return;
+
+  // Self-referral guard — passport-based
+  if (app.passportNumber) {
+    const affiliatePriorApp = await prisma.application.findFirst({
+      where: {
+        userId: affiliate.userId,
+        passportNumber: app.passportNumber,
+      },
+      select: { id: true },
+    });
+    if (affiliatePriorApp) {
+      console.log(`[Affiliate] Self-referral blocked for code ${app.referralCode} (passport match).`);
+      return;
+    }
+  }
+
+  const commission = Math.round(amountKobo * 0.08);
+
+  await prisma.affiliate.update({
+    where: { id: affiliate.id },
+    data: {
+      totalReferrals: { increment: 1 },
+      totalEarned: { increment: commission },
+      balance: { increment: commission },
+    },
+  });
+
+  console.log(`[Affiliate] ₦${(commission / 100).toFixed(2)} credited to ${affiliate.referralCode} for application ${app.ref}.`);
 }
 
 exports.verify = async (req, res, next) => {

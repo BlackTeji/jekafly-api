@@ -70,6 +70,10 @@ model Application {
   passportIssueDate DateTime?
   dob             DateTime?
 
+  // Referral & agent
+  referralCode    String?
+  agentSubmitted  Boolean           @default(false)
+
   // Status & payment
   status          ApplicationStatus @default(RECEIVED)
   paid            Boolean           @default(false)
@@ -156,6 +160,8 @@ enum PaymentType {
   VISA
   INSURANCE
   CONSULTATION
+  FLIGHT
+  HOTEL
 }
 
 enum PaymentStatus {
