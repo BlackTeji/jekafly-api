@@ -98,12 +98,13 @@ exports.sendPendingSurveys = async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
+    // Find DELIVERED apps where deliveredAt was 2-7 days ago, no survey sent yet
     const apps = await prisma.application.findMany({
         where: {
             status: 'DELIVERED',
             deletedAt: null,
             deliveredAt: { gte: sevenDaysAgo, lte: twoDaysAgo },
-            review: null,
+            review: null, // no review record created yet
         },
         include: {
             user: { select: { name: true, email: true, deletedAt: true } },
@@ -116,14 +117,15 @@ exports.sendPendingSurveys = async () => {
         const token = crypto.randomBytes(32).toString('hex');
         const displayName = (app.user.name || 'Traveller').split(' ')[0];
 
+        // Create the review record (empty until survey is filled)
         await prisma.review.create({
             data: {
                 applicationRef: app.ref,
                 userId: app.userId,
                 name: displayName,
                 destination: app.destination,
-                rating: 5,
-                text: '', 
+                rating: 5, // placeholder — overwritten on submit
+                text: '', // placeholder
                 surveyToken: token,
                 surveysentAt: new Date(),
             },
@@ -133,31 +135,63 @@ exports.sendPendingSurveys = async () => {
 
         await sendEmail({
             to: app.user.email,
-            subject: `How was your ${app.destination} visa experience? 🌍`,
+            subject: `${displayName}, how was your ${app.destination} trip?`,
             html: `
-      <div style="font-family:'Plus Jakarta Sans',sans-serif;max-width:520px;margin:0 auto;background:#f7f8fc;border-radius:16px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#0a1f44,#0d2d6b);padding:32px 32px 24px;text-align:center;">
-          <img src="${frontendUrl}/assets/images/JEKAFLY%20LOGO%20B-R%202.png" style="height:36px;margin-bottom:20px;" />
-          <h2 style="color:#fff;font-size:1.4rem;margin:0 0 8px;">Your visa was delivered! 🎉</h2>
-          <p style="color:rgba(255,255,255,0.7);font-size:0.9rem;margin:0;">We'd love to hear about your experience</p>
-        </div>
-        <div style="padding:28px 32px;">
-          <p style="color:#374151;font-size:0.95rem;line-height:1.7;margin-bottom:20px;">
-            Hi <strong>${displayName}</strong>,<br><br>
-            Your <strong>${app.destination} visa</strong> has been delivered — congratulations on your upcoming trip! 🌍<br><br>
-            It would mean a lot to us if you took 60 seconds to share your experience. Your feedback helps other Nigerians make informed decisions.
-          </p>
-          <div style="text-align:center;margin:28px 0;">
-            <a href="${surveyUrl}" style="display:inline-block;background:linear-gradient(135deg,#e8613a,#c04e2a);color:#fff;text-decoration:none;padding:16px 36px;border-radius:12px;font-weight:700;font-size:1rem;">
-              ⭐ Rate Your Experience
-            </a>
-          </div>
-          <p style="color:#9ca3af;font-size:0.78rem;text-align:center;line-height:1.6;">
-            This link is unique to your application and can only be used once.<br>
-            Ref: ${app.ref}
-          </p>
-        </div>
-      </div>`,
+<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jekafly</title></head>
+<body style="margin:0;padding:0;background:#F0F2F8;font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#F0F2F8;padding:40px 0;">
+    <tr><td align="center" style="padding:0 16px;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="max-width:580px;width:100%;">
+        <tr>
+          <td style="background:linear-gradient(135deg,#0D1560 0%,#1C2FBF 100%);padding:32px 40px;border-radius:16px 16px 0 0;text-align:center;position:relative;overflow:hidden;">
+            <img src="https://jekafly.com/assets/images/JEKAFLY%20LOGO%20W-R%202.png" alt="Jekafly" width="148" style="display:block;margin:0 auto 24px;max-width:148px;height:auto;" />
+            <div style="display:inline-block;background:rgba(255,255,255,0.12);border:1px solid rgba(255,255,255,0.2);border-radius:100px;padding:6px 18px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:16px;">Visa Delivered</div>
+            <h1 style="margin:0 0 8px;font-size:28px;font-weight:800;color:#ffffff;letter-spacing:-0.03em;line-height:1.2;">${app.destination} — Done. ✈️</h1>
+            <p style="margin:0;font-size:15px;color:rgba(255,255,255,0.65);line-height:1.6;">Congratulations on your upcoming journey</p>
+          </td>
+        </tr>
+        <tr><td style="background:#E31E24;height:3px;line-height:3px;font-size:0;">&nbsp;</td></tr>
+        <tr>
+          <td style="background:#ffffff;padding:44px 40px 36px;border-radius:0 0 16px 16px;">
+            <p style="margin:0 0 20px;font-size:16px;color:#111827;font-weight:700;">Hi ${displayName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.75;">Your <strong style="color:#0D1560;">${app.destination} visa</strong> has been delivered. We hope your trip is everything you planned for.</p>
+            <p style="margin:0 0 32px;font-size:15px;color:#4B5563;line-height:1.75;">Before you go — would you share a few words about your experience with Jekafly? It takes under a minute, and it helps thousands of Nigerians plan their own journeys with confidence.</p>
+            <table cellpadding="0" cellspacing="0" style="margin:0 auto 32px;">
+              <tr>
+                <td style="border-radius:12px;background:linear-gradient(135deg,#0D1560 0%,#1C2FBF 100%);box-shadow:0 6px 24px rgba(13,21,96,0.3);">
+                  <a href="${surveyUrl}" style="display:inline-block;padding:17px 44px;font-size:16px;font-weight:700;color:#ffffff;text-decoration:none;letter-spacing:-0.01em;border-radius:12px;">Share My Experience →</a>
+                </td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#F8F9FE;border-radius:10px;border:1px solid #EAECF4;margin-bottom:28px;">
+              <tr>
+                <td style="padding:11px 18px;font-size:13px;color:#6B7280;border-bottom:1px solid #F3F4F8;white-space:nowrap;width:40%;">Destination</td>
+                <td style="padding:11px 18px;font-size:13px;color:#111827;font-weight:600;border-bottom:1px solid #F3F4F8;">${app.destination}</td>
+              </tr>
+              <tr>
+                <td style="padding:11px 18px;font-size:13px;color:#6B7280;white-space:nowrap;">Reference</td>
+                <td style="padding:11px 18px;font-size:13px;color:#111827;font-weight:600;font-family:monospace;letter-spacing:0.04em;">${app.ref}</td>
+              </tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:36px;border-top:1px solid #EAECF4;">
+              <tr><td style="padding-top:24px;text-align:center;">
+                <p style="margin:0 0 6px;font-size:12px;color:#9BA5C0;">© ${new Date().getFullYear()} Jekafly. All rights reserved.</p>
+                <p style="margin:0;font-size:12px;color:#9BA5C0;">
+                  <a href="mailto:support@jekafly.com" style="color:#0D1560;text-decoration:none;font-weight:600;">support@jekafly.com</a>
+                  &nbsp;·&nbsp;
+                  <a href="https://jekafly.com" style="color:#0D1560;text-decoration:none;font-weight:600;">jekafly.com</a>
+                </p>
+              </td></tr>
+            </table>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`,
         }).catch(err => console.error(`Survey email failed for ${app.ref}:`, err));
     }
 
