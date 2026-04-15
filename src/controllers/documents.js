@@ -71,7 +71,7 @@ exports.upload = async (req, res, next) => {
     if (applicationId && application) {
       const uploader = await prisma.user.findUnique({ where: { id: req.user.id } });
       const fileList = docs.map(d => `<li style="margin:4px 0;font-size:13px;color:#374151;">${d.name}</li>`).join('');
-      const adminEmail = process.env.ADMIN_EMAIL || 'admin@jekafly.com';
+      const adminEmail = process.env.ADMIN_EMAIL || 'jekaflynigeria@gmail.com';
 
       sendEmail({
         to: adminEmail,

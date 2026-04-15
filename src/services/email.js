@@ -269,7 +269,7 @@ const emails = {
   }),
 
   affiliateApplicationReceived: async (affiliate) => sendEmail({
-    to: process.env.ADMIN_EMAIL || 'admin@jekafly.com',
+    to: process.env.ADMIN_EMAIL || 'jekaflynigeria@gmail.com',
     subject: `New Affiliate Application — ${affiliate.name}`,
     html: layout(`
       ${badge('New Application')}
@@ -331,7 +331,7 @@ const emails = {
   }),
 
   adminNewApplication: async (app, user) => sendEmail({
-    to: process.env.ADMIN_EMAIL || 'admin@jekafly.com',
+    to: process.env.ADMIN_EMAIL || 'jekaflynigeria@gmail.com',
     subject: 'New Application — ' + app.ref + ' (' + app.destination + ')',
     html: layout(
       badge('New Application') +
@@ -354,7 +354,7 @@ const emails = {
   }),
 
   adminPaymentConfirmed: async (app, payment, user) => sendEmail({
-    to: process.env.ADMIN_EMAIL || 'admin@jekafly.com',
+    to: process.env.ADMIN_EMAIL || 'jekaflynigeria@gmail.com',
     subject: 'Payment Confirmed — ' + (app && app.ref ? app.ref : payment.reference) + ' (₦' + (((payment.amount || 0) / 100).toLocaleString()) + ')',
     html: layout(
       badge('Payment Confirmed') +
