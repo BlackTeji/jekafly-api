@@ -330,6 +330,51 @@ const emails = {
     `),
   }),
 
+  adminNewApplication: async (app, user) => sendEmail({
+    to: process.env.ADMIN_EMAIL || 'admin@jekafly.com',
+    subject: 'New Application — ' + app.ref + ' (' + app.destination + ')',
+    html: layout(
+      badge('New Application') +
+      '<h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:' + NAVY + ';letter-spacing:-0.03em;line-height:1.2;">📋 New visa application received.</h1>' +
+      '<p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">A new application has been submitted and is awaiting your review.</p>' +
+      infoTable(
+        infoRow('Reference', '<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">' + app.ref + '</span>') +
+        infoRow('Applicant', app.applicantName) +
+        infoRow('Email', app.email) +
+        infoRow('Destination', app.destination) +
+        infoRow('Visa Type', app.visaType || 'Standard') +
+        infoRow('Purpose', app.purpose) +
+        infoRow('Travel Date', app.travelDate ? new Date(app.travelDate).toDateString() : '—') +
+        infoRow('Account', user && user.name ? user.name + ' <' + user.email + '>' : app.email) +
+        infoRow('Referral Code', app.referralCode || '—') +
+        infoRow('Agent Submitted', app.agentSubmitted ? 'Yes' : 'No')
+      ) +
+      '<div style="text-align:center;margin:32px 0 8px;">' + btn('Review in Admin Panel →', config.frontendUrl + '/admin') + '</div>'
+    ),
+  }),
+
+  adminPaymentConfirmed: async (app, payment, user) => sendEmail({
+    to: process.env.ADMIN_EMAIL || 'admin@jekafly.com',
+    subject: 'Payment Confirmed — ' + (app && app.ref ? app.ref : payment.reference) + ' (₦' + (((payment.amount || 0) / 100).toLocaleString()) + ')',
+    html: layout(
+      badge('Payment Confirmed') +
+      '<h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:' + NAVY + ';letter-spacing:-0.03em;line-height:1.2;">💳 Payment received.</h1>' +
+      '<p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">A visa application payment has been confirmed via Paystack.</p>' +
+      infoTable(
+        infoRow('Application Ref', '<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">' + (app && app.ref ? app.ref : '—') + '</span>') +
+        infoRow('Destination', (app && app.destination) || '—') +
+        infoRow('Applicant', (app && app.applicantName) || '—') +
+        infoRow('Account', user && user.name ? user.name + ' <' + user.email + '>' : '—') +
+        infoRow('Transaction ID', '<span style="font-family:monospace;font-size:13px;">' + payment.reference + '</span>') +
+        infoRow('Amount', '<strong style="color:#16a34a;">₦' + (((payment.amount || 0) / 100).toLocaleString()) + '</strong>') +
+        infoRow('Type', payment.type) +
+        infoRow('Date', new Date().toDateString()) +
+        infoRow('Referral Code', (app && app.referralCode) || '—')
+      ) +
+      '<div style="text-align:center;margin:32px 0 8px;">' + btn('Review in Admin Panel →', config.frontendUrl + '/admin') + '</div>'
+    ),
+  }),
+
   passwordChanged: async (user) => sendEmail({
     to: user.email,
     subject: 'Your Jekafly password was changed',

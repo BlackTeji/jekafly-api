@@ -138,6 +138,7 @@ async function handleChargeSuccess(data) {
       select: { name: true, email: true },
     });
     if (user) await emails.paymentConfirmed(app, payment, user, docCount > 0).catch(() => { });
+    emails.adminPaymentConfirmed(app, payment, user).catch(() => { });
 
     await creditAffiliateCommission(app, payment.amount).catch((err) => {
       console.error('[Affiliate Commission Error]', err.message);

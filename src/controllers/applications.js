@@ -82,6 +82,7 @@ exports.create = async (req, res, next) => {
     });
 
     await emails.applicationConfirmed(app, req.user, hasDocuments).catch(() => { });
+    emails.adminNewApplication(app, req.user).catch(() => { });
 
     res.status(201).json({ ok: true, data: { application: formatApp(app) } });
   } catch (err) { next(err); }
