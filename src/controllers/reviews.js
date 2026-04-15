@@ -98,13 +98,12 @@ exports.sendPendingSurveys = async () => {
     const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000);
     const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
-    // Find DELIVERED apps where deliveredAt was 2-7 days ago, no survey sent yet
     const apps = await prisma.application.findMany({
         where: {
             status: 'DELIVERED',
             deletedAt: null,
             deliveredAt: { gte: sevenDaysAgo, lte: twoDaysAgo },
-            review: null, // no review record created yet
+            review: null,
         },
         include: {
             user: { select: { name: true, email: true, deletedAt: true } },
@@ -117,21 +116,20 @@ exports.sendPendingSurveys = async () => {
         const token = crypto.randomBytes(32).toString('hex');
         const displayName = (app.user.name || 'Traveller').split(' ')[0];
 
-        // Create the review record (empty until survey is filled)
         await prisma.review.create({
             data: {
                 applicationRef: app.ref,
                 userId: app.userId,
                 name: displayName,
                 destination: app.destination,
-                rating: 5, // placeholder — overwritten on submit
-                text: '', // placeholder
+                rating: 5,
+                text: '', 
                 surveyToken: token,
                 surveysentAt: new Date(),
             },
         });
 
-        const surveyUrl = `${frontendUrl}/survey.html?token=${token}`;
+        const surveyUrl = `${frontendUrl}/survey?token=${token}`;
 
         await sendEmail({
             to: app.user.email,

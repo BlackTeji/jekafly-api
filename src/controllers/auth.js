@@ -123,7 +123,6 @@ exports.updateMe = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-const otpStore = new Map();
 const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
 
 exports.requestPasswordOtp = async (req, res, next) => {
@@ -132,7 +131,11 @@ exports.requestPasswordOtp = async (req, res, next) => {
     if (!user) throw new ApiError('User not found.', 404);
 
     const otp = generateOtp();
-    otpStore.set(user.id, { otp, expiresAt: Date.now() + 10 * 60 * 1000 });
+    await prisma.otpToken.upsert({
+      where: { key: user.id },
+      create: { key: user.id, otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+      update: { otp, expiresAt: new Date(Date.now() + 10 * 60 * 1000) },
+    });
 
     await sendEmail({
       to: user.email,
@@ -160,14 +163,14 @@ exports.changePassword = async (req, res, next) => {
     });
     const { currentPassword, newPassword, otp } = schema.parse(req.body);
 
-    const stored = otpStore.get(req.user.id);
+    const stored = await prisma.otpToken.findUnique({ where: { key: req.user.id } });
     if (!stored) throw new ApiError('No OTP found. Please request a new one.', 400);
-    if (Date.now() > stored.expiresAt) {
-      otpStore.delete(req.user.id);
+    if (new Date() > stored.expiresAt) {
+      await prisma.otpToken.delete({ where: { key: req.user.id } }).catch(() => { });
       throw new ApiError('OTP has expired. Please request a new one.', 400);
     }
     if (stored.otp !== otp) throw new ApiError('Invalid OTP.', 400);
-    otpStore.delete(req.user.id);
+    await prisma.otpToken.delete({ where: { key: req.user.id } }).catch(() => { });
 
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     const valid = await bcrypt.compare(currentPassword, user.passwordHash);
@@ -184,7 +187,7 @@ exports.changePassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-const resetOtpStore = new Map();
+
 
 exports.forgotPassword = async (req, res, next) => {
   try {
@@ -200,7 +203,11 @@ exports.forgotPassword = async (req, res, next) => {
     }
 
     const otp = generateOtp();
-    resetOtpStore.set(email.toLowerCase(), { otp, expiresAt: Date.now() + 15 * 60 * 1000, userId: user.id });
+    await prisma.otpToken.upsert({
+      where: { key: email.toLowerCase() },
+      create: { key: email.toLowerCase(), otp, userId: user.id, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
+      update: { otp, userId: user.id, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
+    });
 
     await sendEmail({
       to: user.email,
@@ -229,13 +236,13 @@ exports.resetPassword = async (req, res, next) => {
       newPassword: z.string().min(8),
     }).parse(req.body);
 
-    const record = resetOtpStore.get(email.toLowerCase());
+    const record = await prisma.otpToken.findUnique({ where: { key: email.toLowerCase() } });
 
-    if (!record || record.otp !== otp || Date.now() > record.expiresAt) {
+    if (!record || record.otp !== otp || new Date() > record.expiresAt) {
       return res.status(400).json({ ok: false, error: 'Invalid or expired reset code.' });
     }
 
-    resetOtpStore.delete(email.toLowerCase());
+    await prisma.otpToken.delete({ where: { key: email.toLowerCase() } }).catch(() => { });
 
     const hash = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({

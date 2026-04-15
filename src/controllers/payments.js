@@ -53,8 +53,8 @@ exports.initiate = async (req, res, next) => {
         reference,
         metadata: { userId: req.user.id, ref, type, ...metadata },
         callbackUrl: type === 'CONSULTATION'
-          ? `${config.frontendUrl}/dashboard.html?ref=${reference}`
-          : `${config.frontendUrl}/payment.html?ref=${reference}`,
+          ? `${config.frontendUrl}/dashboard?ref=${reference}`
+          : `${config.frontendUrl}/payment?ref=${reference}`,
       });
     } catch (paystackErr) {
       await prisma.payment.delete({ where: { reference } }).catch(() => { });

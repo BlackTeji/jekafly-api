@@ -1,8 +1,15 @@
 const router = require('express').Router();
+const { rateLimit } = require('express-rate-limit');
 const { authenticate, requireAdmin } = require('../middleware/auth');
 const ctrl = require('../controllers/admin');
 const bankVerify = require('../controllers/bankVerify');
 const affiliateCtrl = require('../controllers/affiliates');
+
+const bankVerifyLimit = rateLimit({
+    windowMs: 60 * 1000, max: 15,
+    message: { ok: false, error: 'Too many verification attempts. Please wait a moment.' },
+    standardHeaders: true, legacyHeaders: false,
+});
 
 // All admin routes require auth + admin role
 router.use(authenticate, requireAdmin);
@@ -32,7 +39,7 @@ router.patch('/affiliates/:id/status', affiliateCtrl.adminUpdateStatus);
 router.patch('/affiliates/payouts/:payoutId/process', affiliateCtrl.adminProcessPayout);
 
 // ─── Flights & Hotels ─────────────────────────────────────────────────────────
-router.get('/verify-bank', bankVerify.verifyBankAccount);
+router.get('/verify-bank', bankVerifyLimit, bankVerify.verifyBankAccount);
 router.get('/flights', ctrl.listFlightBookings);
 router.get('/hotels', ctrl.listHotelBookings);
 

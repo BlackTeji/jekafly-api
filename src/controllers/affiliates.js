@@ -3,7 +3,6 @@ const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 
-const magicTokenStore = new Map();
 
 exports.apply = async (req, res, next) => {
     try {
@@ -36,6 +35,9 @@ exports.apply = async (req, res, next) => {
                 userId: req.user?.id || null,
             },
         });
+
+        const { emails } = require('../services/email');
+        emails.affiliateApplicationReceived(affiliate).catch(() => { });
 
         res.status(201).json({ ok: true, data: { affiliate } });
     } catch (err) { next(err); }
@@ -157,6 +159,11 @@ exports.adminUpdateStatus = async (req, res, next) => {
             });
         }
 
+        if (status === 'REJECTED') {
+            const { emails } = require('../services/email');
+            emails.affiliateRejected(updated).catch(() => { });
+        }
+
         res.json({ ok: true, data: { affiliate: { id: updated.id, status: updated.status.toLowerCase() } } });
     } catch (err) { next(err); }
 };
@@ -189,11 +196,12 @@ exports.magicLogin = async (req, res, next) => {
         const { token } = req.query;
         if (!token) return res.status(400).json({ ok: false, error: 'Missing token.' });
 
-        const record = magicTokenStore.get(token);
-        if (!record || Date.now() > record.expiresAt) {
+        const record = await prisma.magicToken.findUnique({ where: { token } });
+        if (!record || new Date() > record.expiresAt) {
+            if (record) await prisma.magicToken.delete({ where: { token } }).catch(() => { });
             return res.status(400).json({ ok: false, error: 'This link has expired. Please log in manually.' });
         }
-        magicTokenStore.delete(token);
+        await prisma.magicToken.delete({ where: { token } });
 
         const { generateAccessToken, generateRefreshToken, saveRefreshToken, setRefreshCookie } = require('../utils/jwt');
         const user = await prisma.user.findUnique({
@@ -249,8 +257,10 @@ async function issueAffiliateAccount(affiliateId) {
     });
 
     const token = crypto.randomBytes(32).toString('hex');
-    magicTokenStore.set(token, { userId: user.id, expiresAt: Date.now() + 72 * 60 * 60 * 1000, isNewUser });
-    const magicUrl = `${config.frontendUrl}/affiliate-dashboard.html?magic=${token}`;
+    await prisma.magicToken.create({
+        data: { token, userId: user.id, isNewUser, expiresAt: new Date(Date.now() + 72 * 60 * 60 * 1000) },
+    });
+    const magicUrl = `${config.frontendUrl}/affiliate-dashboard?magic=${token}`;
 
     await emails.affiliateApproved(affiliate, magicUrl);
 }

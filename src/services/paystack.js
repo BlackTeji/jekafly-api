@@ -2,7 +2,6 @@ const axios = require('axios');
 const crypto = require('crypto');
 const config = require('../config');
 
-// Create a fresh axios instance per request so the secret key is always current
 const paystackApi = () => axios.create({
   baseURL: config.paystack.baseUrl,
   headers: {
@@ -21,7 +20,7 @@ const initializeTransaction = async ({ email, amount, reference, metadata, callb
       amount,
       reference,
       metadata,
-      callback_url: callbackUrl || `${config.frontendUrl}/payment.html`,
+      callback_url: callbackUrl || `${config.frontendUrl}/payment`,
     });
     console.log('[Paystack] authorization_url:', data.data?.authorization_url);
     return data.data;
@@ -35,7 +34,7 @@ const initializeTransaction = async ({ email, amount, reference, metadata, callb
 // Verify a transaction server-side
 const verifyTransaction = async (reference) => {
   const { data } = await paystackApi().get(`/transaction/verify/${reference}`);
-  return data.data; // { status, amount, reference, customer, metadata }
+  return data.data;
 };
 
 // Validate webhook signature

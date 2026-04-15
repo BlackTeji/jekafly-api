@@ -325,3 +325,27 @@ enum PayoutStatus {
   PENDING
   PROCESSED
 }
+
+// ─── Magic Tokens (affiliate dashboard access) ────────────────────────────────
+model MagicToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  isNewUser Boolean  @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("magic_tokens")
+}
+
+// ─── OTP Tokens (password change / reset) ────────────────────────────────────
+model OtpToken {
+  id        String   @id @default(uuid())
+  key       String   @unique  // userId for change-password, email for forgot-password
+  otp       String
+  userId    String?           // set for reset-password flow
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@map("otp_tokens")
+}

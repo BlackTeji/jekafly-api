@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { execSync } = require('child_process');
 
-// ─── Step 1: prisma generate FIRST so client has latest schema ────────────────
 try {
   execSync('node node_modules/prisma/build/index.js generate', {
     stdio: 'inherit', env: process.env,
@@ -10,7 +9,6 @@ try {
   console.error('Prisma generate error (non-fatal):', e.message);
 }
 
-// ─── Step 2: Now safe to load everything ─────────────────────────────────────
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -156,11 +154,15 @@ async function start() {
       console.error('Enum patch (non-fatal):', e.message);
     }
 
-    console.log('Pushing database schema...');
-    execSync('node node_modules/prisma/build/index.js db push --accept-data-loss', {
-      stdio: 'inherit', env: process.env,
-    });
-    console.log('Schema pushed.');
+    console.log('Running database migrations...');
+    try {
+      execSync('node node_modules/prisma/build/index.js migrate deploy', {
+        stdio: 'inherit', env: process.env,
+      });
+      console.log('Migrations applied.');
+    } catch (e) {
+      console.error('Migration error (non-fatal):', e.message);
+    }
 
     const adminHash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'admin1234', 12);
     await db.user.upsert({

@@ -125,7 +125,7 @@ const emails = {
         ${infoRow('🛡️ Travel Insurance', 'Protect your trip with comprehensive coverage')}
       `)}
       <div style="text-align:center;margin:32px 0 8px;">
-        ${btn('Go to My Dashboard →', `${config.frontendUrl}/dashboard.html`)}
+        ${btn('Go to My Dashboard →', `${config.frontendUrl}/dashboard`)}
       </div>
     `),
   }),
@@ -153,7 +153,7 @@ const emails = {
         : alertBox('📎', '<strong>Action required — upload your documents.</strong> Your application has been received, but your supporting documents have not been submitted yet. Please log in to your dashboard and upload your documents as soon as possible to avoid delays in processing your application.', '#d97706')
       }
       <div style="text-align:center;margin:32px 0 8px;">
-        ${btn(hasDocuments ? 'Complete Payment →' : 'Upload My Documents →', `${config.frontendUrl}/dashboard.html`)}
+        ${btn(hasDocuments ? 'Complete Payment →' : 'Upload My Documents →', `${config.frontendUrl}/dashboard`)}
       </div>
       ${!hasDocuments ? `<p style="margin:8px 0 0;text-align:center;font-size:12px;color:#9BA5C0;">You can upload your documents from the <strong>My Applications</strong> section of your dashboard.</p>` : ''}
     `),
@@ -183,7 +183,7 @@ const emails = {
         : alertBox('📎', '<strong>Action required — upload your documents now.</strong> Your payment is confirmed but your supporting documents have not been submitted yet. Your application cannot proceed to embassy review until your documents are uploaded. Please log in to your dashboard and upload them as soon as possible.', '#d97706')
       }
       <div style="text-align:center;margin:32px 0 8px;">
-        ${btn(hasDocuments ? 'Track My Application →' : 'Upload My Documents →', `${config.frontendUrl}/dashboard.html`)}
+        ${btn(hasDocuments ? 'Track My Application →' : 'Upload My Documents →', `${config.frontendUrl}/dashboard`)}
       </div>
       ${!hasDocuments ? `<p style="margin:8px 0 0;text-align:center;font-size:12px;color:#9BA5C0;">Go to <strong>My Applications</strong> in your dashboard, select this application, and upload your documents.</p>` : ''}
     `),
@@ -227,7 +227,7 @@ const emails = {
         `)}
         ${statusNote ? alertBox('📌', statusNote, statusColor) : ''}
         <div style="text-align:center;margin:32px 0 8px;">
-          ${btn('View in Dashboard →', `${config.frontendUrl}/dashboard.html`)}
+          ${btn('View in Dashboard →', `${config.frontendUrl}/dashboard`)}
         </div>
       `),
     });
@@ -242,7 +242,7 @@ const emails = {
       <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${user.name.split(' ')[0]}, your consultation payment has been received. A Jekafly visa expert will be in touch shortly to schedule your session.</p>
       ${alertBox('📅', 'Log in to your dashboard to view your consultation details and any documents your expert may need from you ahead of the session.')}
       <div style="text-align:center;margin:32px 0 8px;">
-        ${btn('Go to My Dashboard →', `${config.frontendUrl}/dashboard.html`)}
+        ${btn('Go to My Dashboard →', `${config.frontendUrl}/dashboard`)}
       </div>
     `),
   }),
@@ -263,7 +263,7 @@ const emails = {
       `)}
       ${alertBox('🛡️', 'Travel with confidence. Your policy covers you throughout your trip. Contact <a href="mailto:support@jekafly.com" style="color:' + NAVY + ';font-weight:600;">support@jekafly.com</a> if you need your policy documents.')}
       <div style="text-align:center;margin:32px 0 8px;">
-        ${btn('View My Dashboard →', `${config.frontendUrl}/dashboard.html`)}
+        ${btn('View My Dashboard →', `${config.frontendUrl}/dashboard`)}
       </div>
     `),
   }),
@@ -286,15 +286,13 @@ const emails = {
       `)}
       ${affiliate.motivation ? alertBox('💬', `<strong>Why they want to join:</strong><br>${affiliate.motivation}`) : ''}
       <div style="text-align:center;margin:32px 0 8px;">
-        ${btn('Review in Admin Panel →', `${config.frontendUrl}/admin.html`)}
+        ${btn('Review in Admin Panel →', `${config.frontendUrl}/admin`)}
       </div>
     `),
   }),
 
   affiliateApproved: async (affiliate, magicUrl) => {
-    const affiliateUrl = magicUrl
-      ? magicUrl.replace('/dashboard.html', '/affiliate-dashboard.html')
-      : `${config.frontendUrl}/affiliate-dashboard.html`;
+    const affiliateUrl = magicUrl || `${config.frontendUrl}/affiliate-dashboard`;
     return sendEmail({
       to: affiliate.email,
       subject: 'You are now a Jekafly Affiliate — Welcome aboard',
@@ -312,7 +310,7 @@ const emails = {
         <div style="text-align:center;margin:32px 0 16px;">
           ${btn('Go to My Affiliate Dashboard →', affiliateUrl)}
         </div>
-        <p style="margin:0;text-align:center;font-size:12px;color:#9BA5C0;line-height:1.6;">This access link expires in <strong>72 hours</strong>. After that, log in at <a href="${config.frontendUrl}/affiliate-dashboard.html" style="color:${NAVY};font-weight:600;text-decoration:none;">jekafly.com/affiliate-dashboard</a> using your email address.</p>
+        <p style="margin:0;text-align:center;font-size:12px;color:#9BA5C0;line-height:1.6;">This access link expires in <strong>72 hours</strong>. After that, log in at <a href="${config.frontendUrl}/affiliate-dashboard" style="color:${NAVY};font-weight:600;text-decoration:none;">jekafly.com/affiliate-dashboard</a> using your email address.</p>
       `),
     });
   },

@@ -113,7 +113,7 @@ exports.upload = async (req, res, next) => {
             <table cellpadding="0" cellspacing="0" style="margin:32px auto 8px;">
               <tr>
                 <td style="border-radius:10px;background:linear-gradient(135deg,#0D1560 0%,#1C2FBF 100%);box-shadow:0 4px 16px rgba(13,21,96,0.28);">
-                  <a href="${config.frontendUrl}/admin.html" style="display:inline-block;padding:15px 36px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;letter-spacing:-0.01em;border-radius:10px;">Review in Admin Panel →</a>
+                  <a href="${config.frontendUrl}/admin" style="display:inline-block;padding:15px 36px;font-size:15px;font-weight:700;color:#ffffff;text-decoration:none;letter-spacing:-0.01em;border-radius:10px;">Review in Admin Panel →</a>
                 </td>
               </tr>
             </table>
