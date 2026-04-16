@@ -235,16 +235,14 @@ const emails = {
 
   consultationBooked: async (user) => sendEmail({
     to: user.email,
-    subject: 'Consultation Confirmed — Jekafly',
-    html: layout(`
-      ${badge('Consultation Confirmed')}
-      <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">Your consultation is confirmed.</h1>
-      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ${user.name.split(' ')[0]}, your consultation payment has been received. A Jekafly visa expert will be in touch shortly to schedule your session.</p>
-      ${alertBox('📅', 'Log in to your dashboard to view your consultation details and any documents your expert may need from you ahead of the session.')}
-      <div style="text-align:center;margin:32px 0 8px;">
-        ${btn('Go to My Dashboard →', `${config.frontendUrl}/dashboard`)}
-      </div>
-    `),
+    subject: 'You\'re booked — Jekafly Consultation',
+    html: layout(
+      badge('Consultation Confirmed') +
+      '<h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:' + NAVY + ';letter-spacing:-0.03em;line-height:1.2;">You\'re all set, ' + user.name.split(' ')[0] + '.</h1>' +
+      '<p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Your consultation has been confirmed and payment received. A Jekafly visa expert will join your session at the scheduled time — just show up and we\'ll take it from there.</p>' +
+      alertBox('📅', 'To make the most of your session, log in to your dashboard and upload any relevant documents ahead of time — your expert will review them before joining.') +
+      '<div style="text-align:center;margin:32px 0 8px;">' + btn('Go to My Dashboard →', config.frontendUrl + '/dashboard') + '</div>'
+    ),
   }),
 
   insurancePolicy: async (policy, user) => sendEmail({
