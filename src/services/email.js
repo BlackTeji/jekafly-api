@@ -373,6 +373,23 @@ const emails = {
     ),
   }),
 
+  surveyRequest: async (app, displayName, surveyUrl) => sendEmail({
+    to: app.user?.email || app.email,
+    subject: displayName + ', how was your ' + app.destination + ' trip?',
+    html: layout(
+      badge('Visa Delivered') +
+      '<h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:' + NAVY + ';letter-spacing:-0.03em;line-height:1.2;">Your visa has been delivered. ✈️</h1>' +
+      '<p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Hi ' + displayName + ', your <strong style="color:' + NAVY + ';">' + app.destination + ' visa</strong> has been delivered. We hope your trip is everything you planned for.</p>' +
+      '<p style="margin:0 0 32px;font-size:15px;color:#4B5563;line-height:1.7;">Before you go — would you share a few words about your experience with Jekafly? It takes under a minute, and it helps thousands of Nigerians plan their own journeys with confidence.</p>' +
+      infoTable(
+        infoRow('Destination', app.destination) +
+        infoRow('Reference', '<span style="font-family:monospace;font-size:13px;letter-spacing:0.04em;">' + app.ref + '</span>')
+      ) +
+      '<div style="text-align:center;margin:32px 0 8px;">' + btn('Share My Experience →', surveyUrl) + '</div>' +
+      '<p style="text-align:center;font-size:12px;color:#9BA5C0;margin:16px 0 0;">This link is unique to your application and can only be used once.</p>'
+    ),
+  }),
+
   passwordChanged: async (user) => sendEmail({
     to: user.email,
     subject: 'Your Jekafly password was changed',

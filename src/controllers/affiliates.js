@@ -45,9 +45,24 @@ exports.apply = async (req, res, next) => {
 
 exports.getMe = async (req, res, next) => {
     try {
-        const affiliate = await prisma.affiliate.findFirst({ where: { userId: req.user.id } });
+        const affiliate = await prisma.affiliate.findFirst({
+            where: { userId: req.user.id },
+            include: { payouts: { orderBy: { requestedAt: 'desc' }, take: 10 } },
+        });
         if (!affiliate) throw new ApiError('Affiliate profile not found.', 404);
-        res.json({ ok: true, data: { affiliate: fmtAffiliate(affiliate) } });
+        res.json({
+            ok: true,
+            data: {
+                affiliate: fmtAffiliate(affiliate),
+                stats: {
+                    totalClicks: affiliate.totalClicks,
+                    totalReferrals: affiliate.totalReferrals,
+                    totalEarned: affiliate.totalEarned / 100,
+                    balance: affiliate.balance / 100,
+                },
+                payouts: affiliate.payouts.map(fmtPayout),
+            },
+        });
     } catch (err) { next(err); }
 };
 
@@ -270,6 +285,7 @@ const fmtAffiliate = (a) => ({
     referralCode: a.referralCode, status: a.status.toLowerCase(),
     totalClicks: a.totalClicks, totalReferrals: a.totalReferrals,
     totalEarned: a.totalEarned / 100, totalPaid: a.totalPaid / 100, balance: a.balance / 100,
+    bankName: a.bankName || '', bankAccount: a.bankAccount || '', accountName: a.accountName || '',
     createdAt: a.createdAt,
 });
 
