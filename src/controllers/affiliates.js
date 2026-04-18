@@ -280,6 +280,34 @@ async function issueAffiliateAccount(affiliateId) {
     await emails.affiliateApproved(affiliate, magicUrl);
 }
 
+exports.getReferrals = async (req, res, next) => {
+    try {
+        const affiliate = await prisma.affiliate.findFirst({ where: { userId: req.user.id } });
+        if (!affiliate) throw new ApiError('Affiliate profile not found.', 404);
+
+        const applications = await prisma.application.findMany({
+            where: { referralCode: affiliate.referralCode, deletedAt: null },
+            select: {
+                ref: true, applicantName: true, destination: true,
+                status: true, paid: true, fee: true, createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+        });
+
+        const referrals = applications.map(a => ({
+            ref: a.ref,
+            name: a.applicantName,
+            destination: a.destination,
+            status: a.status.toLowerCase(),
+            paid: a.paid,
+            commission: a.paid ? Math.round((a.fee || 0) * 0.08) / 100 : 0,
+            date: a.createdAt,
+        }));
+
+        res.json({ ok: true, data: { referrals } });
+    } catch (err) { next(err); }
+};
+
 const fmtAffiliate = (a) => ({
     id: a.id, name: a.name, email: a.email, phone: a.phone,
     referralCode: a.referralCode, status: a.status.toLowerCase(),

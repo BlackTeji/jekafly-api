@@ -7,6 +7,7 @@ router.post('/apply', optionalAuth, ctrl.apply);
 
 router.get('/me', authenticate, ctrl.getMe);
 router.get('/stats', authenticate, ctrl.getStats);
+router.get('/referrals', authenticate, ctrl.getReferrals);
 router.get('/payouts', authenticate, ctrl.getPayouts);
 router.post('/payouts/request', authenticate, ctrl.requestPayout);
 
