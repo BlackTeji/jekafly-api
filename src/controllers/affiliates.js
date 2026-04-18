@@ -103,7 +103,7 @@ exports.getPayouts = async (req, res, next) => {
 exports.requestPayout = async (req, res, next) => {
     try {
         const schema = z.object({
-            amount: z.number().min(1000),
+            amount: z.number().min(5000, 'Minimum payout amount is ₦5,000.'),
             bankDetails: z.object({
                 bankName: z.string().min(2),
                 accountNumber: z.string().min(10),

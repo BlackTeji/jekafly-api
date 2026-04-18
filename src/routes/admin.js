@@ -35,8 +35,8 @@ router.get('/payments', ctrl.getAllPayments);
 
 // ─── Affiliates ───────────────────────────────────────────────────────────────
 router.get('/affiliates', affiliateCtrl.adminList);
-router.patch('/affiliates/:id/status', affiliateCtrl.adminUpdateStatus);
 router.patch('/affiliates/payouts/:payoutId/process', affiliateCtrl.adminProcessPayout);
+router.patch('/affiliates/:id/status', affiliateCtrl.adminUpdateStatus);
 
 // ─── Flights & Hotels ─────────────────────────────────────────────────────────
 router.get('/verify-bank', bankVerifyLimit, bankVerify.verifyBankAccount);
