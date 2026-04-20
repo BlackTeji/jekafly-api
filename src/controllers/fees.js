@@ -1,9 +1,14 @@
+const cache = require('../services/cache');
 const { z } = require('zod');
 const prisma = require('../utils/prisma');
 
 // ─── GET /fees ────────────────────────────────────────────────────────────────
 exports.getAll = async (req, res, next) => {
   try {
+    const cacheKey = 'fees:all';
+    const cached = cache.get(cacheKey);
+    if (cached) return res.json({ ok: true, data: cached });
+
     const [fees, svcRow] = await Promise.all([
       prisma.fee.findMany({ orderBy: { country: 'asc' } }),
       prisma.serviceFee.findUnique({ where: { id: 'singleton' } }),
@@ -16,15 +21,9 @@ exports.getAll = async (req, res, next) => {
       if (f.enabled) enabledCountries.push(f.country);
     });
 
-    res.set('Cache-Control', 'no-store');
-    res.json({
-      ok: true,
-      data: {
-        serviceFee: svcRow?.amount ?? 25000,
-        destinations,
-        enabledCountries, // list of countries open for visa processing
-      }
-    });
+    const data = { serviceFee: svcRow?.amount ?? 25000, destinations, enabledCountries };
+    cache.set(cacheKey, data, 30 * 60 * 1000);
+    res.json({ ok: true, data });
   } catch (err) { next(err); }
 };
 
@@ -37,6 +36,7 @@ exports.setServiceFee = async (req, res, next) => {
       create: { id: 'singleton', amount },
       update: { amount },
     });
+    cache.del('fees:all');
     res.json({ ok: true, data: { serviceFee: svc.amount } });
   } catch (err) { next(err); }
 };
@@ -59,7 +59,6 @@ exports.setDestinationFee = async (req, res, next) => {
 exports.toggleCountry = async (req, res, next) => {
   try {
     const country = decodeURIComponent(req.params.country);
-    // Get current state (upsert to ensure row exists)
     const existing = await prisma.fee.findUnique({ where: { country } });
     const currentEnabled = existing?.enabled ?? true;
     const fee = await prisma.fee.upsert({

@@ -1,4 +1,6 @@
 const { z } = require('zod');
+const sse = require('../services/sse');
+const sms = require('../services/sms');
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 const { emails } = require('../services/email');
@@ -39,7 +41,7 @@ exports.listApplications = async (req, res, next) => {
       total: all.length,
       pending: all.filter(a => ['RECEIVED', 'PROCESSING', 'EMBASSY'].includes(a.status)).length,
       approved: all.filter(a => ['APPROVED', 'DELIVERED'].includes(a.status)).length,
-      
+
       revenue: all.filter(a => a.paid).reduce((s, a) => s + a.fee, 0) / 100,
     };
 
@@ -74,6 +76,17 @@ exports.updateStatus = async (req, res, next) => {
       select: { name: true, email: true },
     });
     if (user) await emails.statusUpdated(updated, note, user).catch(() => { });
+
+    // SMS notification
+    if (user?.phone) sms.statusUpdate(user.phone, user.name, updated.ref, updated.status).catch(() => { });
+
+    // Real-time push to client dashboard
+    sse.sendToUser(app.userId, 'application:status', {
+      ref: updated.ref,
+      status: updated.status.toLowerCase(),
+      note,
+      updatedAt: new Date().toISOString(),
+    });
 
     res.json({ ok: true, data: { application: fmt(updated) } });
   } catch (err) { next(err); }
@@ -124,7 +137,7 @@ exports.updateRole = async (req, res, next) => {
       where: { id: req.params.id },
       data: {
         role,
-    
+
         ...(role === 'USER' && { adminRole: null }),
       },
       select: { id: true, name: true, email: true, role: true, adminRole: true },
@@ -167,7 +180,7 @@ exports.getAllPayments = async (req, res, next) => {
         payments: payments.map(p => ({
           id: p.id,
           type: p.type,
-          amount: p.amount / 100, 
+          amount: p.amount / 100,
           status: p.status,
           metadata: p.metadata,
           reference: p.reference,
@@ -239,7 +252,7 @@ exports.getApplication = async (req, res, next) => {
       data: {
         application: {
           ...app,
-          fee: app.fee / 100, 
+          fee: app.fee / 100,
           status: app.status.toLowerCase(),
           statusHistory: (app.statusHistory || []).map(h => ({
             status: h.status.toLowerCase(),
@@ -393,7 +406,7 @@ exports.downloadDocumentsZip = async (req, res, next) => {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (app) => ({
   ...app,
-  fee: app.fee / 100, 
+  fee: app.fee / 100,
   status: app.status.toLowerCase(),
   statusHistory: (app.statusHistory || []).map(h => ({
     status: h.status.toLowerCase(), note: h.note, date: h.createdAt,

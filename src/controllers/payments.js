@@ -1,4 +1,6 @@
 const { z } = require('zod');
+const sse = require('../services/sse');
+const sms = require('../services/sms');
 const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
@@ -139,6 +141,16 @@ async function handleChargeSuccess(data) {
     });
     if (user) await emails.paymentConfirmed(app, payment, user, docCount > 0).catch(() => { });
     emails.adminPaymentConfirmed(app, payment, user).catch(() => { });
+
+    // SMS notification
+    if (user?.phone) sms.paymentConfirmed(user.phone, user.name, app.ref, payment.amount / 100).catch(() => { });
+
+    // Real-time push to client dashboard
+    if (app.userId) sse.sendToUser(app.userId, 'payment:confirmed', {
+      ref: app.ref,
+      amount: payment.amount / 100,
+      ts: new Date().toISOString(),
+    });
 
     await creditAffiliateCommission(app, payment.amount).catch((err) => {
       console.error('[Affiliate Commission Error]', err.message);

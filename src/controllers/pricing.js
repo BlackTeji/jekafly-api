@@ -1,4 +1,5 @@
 const { z } = require('zod');
+const cache = require('../services/cache');
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 
@@ -14,7 +15,7 @@ const pricingSchema = z.object({
     processingFeePercent: z.number().int().min(0).max(20).optional(),
 });
 
-// GET /pricing — public, returns current prices
+
 exports.get = async (req, res, next) => {
     try {
         const config = await prisma.pricingConfig.upsert({
@@ -26,7 +27,6 @@ exports.get = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// PATCH /pricing — admin only, update any subset of prices
 exports.update = async (req, res, next) => {
     try {
         if (req.user?.role !== 'ADMIN') throw new ApiError('Forbidden', 403);

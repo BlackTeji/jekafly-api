@@ -102,6 +102,7 @@ app.use('/api/v1/affiliates', affiliateRoutes);
 app.use('/api/v1/flights', flightRoutes);
 app.use('/api/v1/hotels', hotelRoutes);
 app.use('/api/v1/bank', bankRoutes);
+app.use('/api/v1/events', require('./routes/events'));
 
 app.use(notFound);
 app.use(errorHandler);

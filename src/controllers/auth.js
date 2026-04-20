@@ -1,3 +1,4 @@
+const sms = require('../services/sms');
 const bcrypt = require('bcryptjs');
 const { z } = require('zod');
 const crypto = require('crypto');
@@ -150,6 +151,7 @@ exports.requestPasswordOtp = async (req, res, next) => {
         </div>`,
     });
 
+    if (user.phone) sms.otpMessage(user.phone, otp).catch(() => { });
     res.json({ ok: true, data: { message: 'OTP sent to your email.' } });
   } catch (err) { next(err); }
 };
