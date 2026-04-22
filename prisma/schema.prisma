@@ -43,6 +43,8 @@ model RefreshToken {
   expiresAt DateTime
   createdAt DateTime @default(now())
 
+  @@index([userId])
+  @@index([expiresAt])
   @@map("refresh_tokens")
 }
 
@@ -94,6 +96,11 @@ model Application {
   payments        Payment[]
   review          Review?
 
+  @@index([userId])
+  @@index([status])
+  @@index([referralCode])
+  @@index([createdAt])
+  @@index([userId, status])
   @@map("applications")
 }
 
@@ -114,6 +121,8 @@ model StatusHistory {
   note          String
   createdAt     DateTime    @default(now())
 
+  @@index([applicationId])
+  @@index([createdAt])
   @@map("status_history")
 }
 
@@ -133,6 +142,8 @@ model Document {
 
   uploadedAt    DateTime    @default(now())
 
+  @@index([userId])
+  @@index([applicationId])
   @@map("documents")
 }
 
@@ -153,6 +164,9 @@ model Payment {
   initiatedAt   DateTime      @default(now())
   paidAt        DateTime?
 
+  @@index([applicationId])
+  @@index([userId])
+  @@index([status])
   @@map("payments")
 }
 
@@ -257,6 +271,8 @@ model Review {
 
   application    Application @relation(fields: [applicationRef], references: [ref])
 
+  @@index([approved])
+  @@index([userId])
   @@map("reviews")
 }
 
@@ -294,6 +310,8 @@ model Affiliate {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@index([userId])
+  @@index([status])
   @@map("affiliates")
 }
 
@@ -318,6 +336,8 @@ model AffiliatePayout {
   requestedAt   DateTime @default(now())
   processedAt   DateTime?
 
+  @@index([affiliateId])
+  @@index([status])
   @@map("affiliate_payouts")
 }
 
@@ -348,4 +368,24 @@ model OtpToken {
   createdAt DateTime @default(now())
 
   @@map("otp_tokens")
+}
+
+// ─── Page View Tracking ───────────────────────────────────────────────────────
+model PageView {
+  id          String   @id @default(uuid())
+  page        String
+  referrer    String?
+  sessionId   String?
+  userId      String?
+  duration    Int?     // seconds on page
+  scrollDepth Int?     // 0-100 percent
+  ip          String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([page])
+  @@index([sessionId])
+  @@index([createdAt])
+  @@index([userId])
+  @@map("page_views")
 }

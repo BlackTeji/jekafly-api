@@ -1,6 +1,7 @@
 require('dotenv').config();
 const { execSync } = require('child_process');
 
+// ─── Step 1: prisma generate FIRST so client has latest schema ────────────────
 try {
   execSync('node node_modules/prisma/build/index.js generate', {
     stdio: 'inherit', env: process.env,
@@ -9,6 +10,7 @@ try {
   console.error('Prisma generate error (non-fatal):', e.message);
 }
 
+// ─── Step 2: Now safe to load everything ─────────────────────────────────────
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -103,6 +105,7 @@ app.use('/api/v1/flights', flightRoutes);
 app.use('/api/v1/hotels', hotelRoutes);
 app.use('/api/v1/bank', bankRoutes);
 app.use('/api/v1/events', require('./routes/events'));
+app.use('/api/v1/track', require('./routes/track'));
 
 app.use(notFound);
 app.use(errorHandler);
