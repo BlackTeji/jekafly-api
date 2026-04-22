@@ -4,6 +4,7 @@ const { authenticate, requireAdmin } = require('../middleware/auth');
 const ctrl = require('../controllers/admin');
 const bankVerify = require('../controllers/bankVerify');
 const affiliateCtrl = require('../controllers/affiliates');
+const analyticsCtrl = require('../controllers/analytics');
 
 const bankVerifyLimit = rateLimit({
     windowMs: 60 * 1000, max: 15,
@@ -32,6 +33,9 @@ router.get('/documents', ctrl.listDocuments);
 
 // ─── Payments ────────────────────────────────────────────────────────────────
 router.get('/payments', ctrl.getAllPayments);
+
+// ─── Analytics ───────────────────────────────────────────────────────────────
+router.get('/analytics', analyticsCtrl.getDashboard);
 
 // ─── Affiliates ───────────────────────────────────────────────────────────────
 router.get('/affiliates', affiliateCtrl.adminList);
