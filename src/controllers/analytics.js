@@ -11,7 +11,7 @@ function dateRange(period) {
     if (period === '7d') start.setDate(now.getDate() - 7);
     else if (period === '30d') start.setDate(now.getDate() - 30);
     else if (period === '90d') start.setDate(now.getDate() - 90);
-    else start.setFullYear(2020, 0, 1);
+    else start.setFullYear(2020, 0, 1); // all time
     return { start, end: now };
 }
 
@@ -205,14 +205,23 @@ exports.getDashboard = async (req, res, next) => {
             { type: 'Insurance', amount: insuranceRevenue },
         ].filter(r => r.amount > 0);
 
-        // ── Peak activity hours (from statusHistory) ───────────────────────────
-        const hourMap = new Array(24).fill(0);
-        statusHistory.forEach(h => {
-            hourMap[new Date(h.createdAt).getHours()]++;
+        // ── Peak activity heatmap (day × hour) from all app creation events ──
+        // 7 days × 24 hours grid — uses applications + statusHistory combined
+        const heatGrid = Array.from({ length: 7 }, () => new Array(24).fill(0));
+        const allEvents = [
+            ...apps.map(a => a.createdAt),
+            ...statusHistory.map(h => h.createdAt),
+        ];
+        allEvents.forEach(ts => {
+            const d = new Date(ts);
+            const day = d.getDay(); // 0=Sun, 6=Sat
+            const hour = d.getHours();
+            heatGrid[day][hour]++;
         });
-        const peakHours = hourMap.map((count, hour) => ({
-            hour: hour === 0 ? '12am' : hour < 12 ? `${hour}am` : hour === 12 ? '12pm' : `${hour - 12}pm`,
-            count,
+        const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+        const peakHours = heatGrid.map((hours, day) => ({
+            day: DAY_LABELS[day],
+            hours: hours.map((count, h) => ({ hour: h, count })),
         }));
 
         const data = {
@@ -267,7 +276,7 @@ exports.getDashboard = async (req, res, next) => {
             peakHours,
         };
 
-        cache.set(cacheKey, data, 5 * 60 * 1000);
+        cache.set(cacheKey, data, 5 * 60 * 1000); // 5-min cache
         res.json({ ok: true, data });
     } catch (err) { next(err); }
 };
