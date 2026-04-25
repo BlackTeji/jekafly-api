@@ -27,7 +27,6 @@ const appSchema = z.object({
 
 const toDate = (s) => s ? new Date(s) : undefined;
 
-// ─── POST /applications ───────────────────────────────────────────────────────
 exports.create = async (req, res, next) => {
   try {
     const data = appSchema.parse(req.body);
@@ -88,7 +87,6 @@ exports.create = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── GET /applications ────────────────────────────────────────────────────────
 exports.list = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -110,7 +108,6 @@ exports.list = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── GET /applications/:ref ───────────────────────────────────────────────────
 exports.getOne = async (req, res, next) => {
   try {
     const app = await prisma.application.findUnique({
@@ -130,7 +127,6 @@ exports.getOne = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── GET /applications/track/:ref (public) ────────────────────────────────────
 exports.track = async (req, res, next) => {
   try {
     const app = await prisma.application.findUnique({
@@ -147,7 +143,6 @@ exports.track = async (req, res, next) => {
         status: app.status,
         statusHistory: app.statusHistory.map(h => ({
           status: h.status,
-          note: h.note,
           date: h.createdAt,
         })),
       },
@@ -155,7 +150,6 @@ exports.track = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── Format helper ────────────────────────────────────────────────────────────
 const formatApp = (app) => ({
   ...app,
   fee: app.fee / 100,

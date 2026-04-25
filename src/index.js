@@ -1,7 +1,6 @@
 require('dotenv').config();
 const { execSync } = require('child_process');
 
-// ─── Step 1: prisma generate FIRST so client has latest schema ────────────────
 try {
   execSync('node node_modules/prisma/build/index.js generate', {
     stdio: 'inherit', env: process.env,
@@ -10,7 +9,6 @@ try {
   console.error('Prisma generate error (non-fatal):', e.message);
 }
 
-// ─── Step 2: Now safe to load everything ─────────────────────────────────────
 const express = require('express');
 const helmet = require('helmet');
 const cors = require('cors');
@@ -39,23 +37,40 @@ const bankRoutes = require('./routes/bank');
 const app = express();
 app.set('trust proxy', 1);
 
-app.use(helmet());
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'"],
+      connectSrc: ["'self'", 'https://api.paystack.co'],
+      imgSrc: ["'self'", 'data:', 'https:'],
+      frameSrc: ["'none'"],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+    },
+  },
+  crossOriginEmbedderPolicy: false,
+}));
+
+const ALLOWED_ORIGINS = [
+  config.frontendUrl,
+  config.frontendUrl ? config.frontendUrl.replace('https://', 'https://www.') : null,
+  'https://jekafly-frontend-verz.vercel.app',
+  'http://localhost:5500',
+  'http://localhost:5506',
+  'http://127.0.0.1:5500',
+  'http://127.0.0.1:5506',
+].filter(Boolean);
+
 app.use(cors({
   origin: function (origin, callback) {
     if (!origin) return callback(null, true);
-    const primary = config.frontendUrl;
-    const wwwVariant = primary ? primary.replace('https://', 'https://www.') : null;
-    const allowed = [
-      primary,
-      wwwVariant,
-      'https://jekafly-frontend-verz.vercel.app',
-      'http://localhost:5500',
-      'http://localhost:5506',
-      'http://127.0.0.1:5500',
-      'http://127.0.0.1:5506',
-    ].filter(Boolean);
-    const isVercelPreview = /^https:\/\/jekafly-frontend[a-z0-9-]*\.vercel\.app$/.test(origin);
-    if (allowed.includes(origin) || isVercelPreview) return callback(null, origin);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, origin);
+    if (config.nodeEnv !== 'production') {
+      const isVercelPreview = /^https:\/\/jekafly-frontend-[a-f0-9]{8,}\.vercel\.app$/.test(origin);
+      if (isVercelPreview) return callback(null, origin);
+    }
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
@@ -75,14 +90,42 @@ app.use('/api/', rateLimit({
   message: { ok: false, error: 'Too many requests. Please try again later.' },
   standardHeaders: true, legacyHeaders: false,
 }));
+
 app.use('/api/v1/auth/login', rateLimit({
-  windowMs: 15 * 60 * 1000, max: 50,
+  windowMs: 15 * 60 * 1000, max: 20,
   message: { ok: false, error: 'Too many login attempts. Please wait 15 minutes and try again.' },
   standardHeaders: true, legacyHeaders: false,
 }));
+
 app.use('/api/v1/auth/register', rateLimit({
-  windowMs: 60 * 60 * 1000, max: 50,
+  windowMs: 60 * 60 * 1000, max: 20,
   message: { ok: false, error: 'Too many registration attempts. Please try again later.' },
+  standardHeaders: true, legacyHeaders: false,
+}));
+
+app.use('/api/v1/auth/forgot-password', rateLimit({
+  windowMs: 15 * 60 * 1000, max: 5,
+  keyGenerator: (req) => (req.body?.email || '').toLowerCase() || req.ip,
+  message: { ok: false, error: 'Too many reset attempts. Please wait before trying again.' },
+  standardHeaders: true, legacyHeaders: false,
+}));
+
+app.use('/api/v1/auth/reset-password', rateLimit({
+  windowMs: 15 * 60 * 1000, max: 10,
+  keyGenerator: (req) => (req.body?.email || '').toLowerCase() || req.ip,
+  message: { ok: false, error: 'Too many reset attempts. Please wait before trying again.' },
+  standardHeaders: true, legacyHeaders: false,
+}));
+
+app.use('/api/v1/affiliates/apply', rateLimit({
+  windowMs: 60 * 60 * 1000, max: 3,
+  message: { ok: false, error: 'Too many applications submitted. Please try again later.' },
+  standardHeaders: true, legacyHeaders: false,
+}));
+
+app.use('/api/v1/applications/track', rateLimit({
+  windowMs: 60 * 1000, max: 10,
+  message: { ok: false, error: 'Too many tracking requests. Please slow down.' },
   standardHeaders: true, legacyHeaders: false,
 }));
 
@@ -110,7 +153,6 @@ app.use('/api/v1/track', require('./routes/track'));
 app.use(notFound);
 app.use(errorHandler);
 
-// ─── DB setup + seed + start ──────────────────────────────────────────────────
 async function start() {
   try {
     const { PrismaClient } = require('@prisma/client');
@@ -124,18 +166,10 @@ async function start() {
         EXCEPTION WHEN duplicate_object THEN NULL;
         END $$;
       `);
-      await db.$executeRawUnsafe(`
-        ALTER TABLE fees ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true;
-      `);
-      await db.$executeRawUnsafe(`
-        ALTER TABLE applications ADD COLUMN IF NOT EXISTS "passportIssueDate" TIMESTAMP;
-      `);
-      await db.$executeRawUnsafe(`
-        ALTER TABLE users ADD COLUMN IF NOT EXISTS "adminRole" TEXT;
-      `);
-      await db.$executeRawUnsafe(`
-        ALTER TABLE pricing_config ADD COLUMN IF NOT EXISTS "processingFeePercent" INTEGER NOT NULL DEFAULT 5;
-      `);
+      await db.$executeRawUnsafe(`ALTER TABLE fees ADD COLUMN IF NOT EXISTS enabled BOOLEAN NOT NULL DEFAULT true;`);
+      await db.$executeRawUnsafe(`ALTER TABLE applications ADD COLUMN IF NOT EXISTS "passportIssueDate" TIMESTAMP;`);
+      await db.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "adminRole" TEXT;`);
+      await db.$executeRawUnsafe(`ALTER TABLE pricing_config ADD COLUMN IF NOT EXISTS "processingFeePercent" INTEGER NOT NULL DEFAULT 5;`);
       await db.$executeRawUnsafe(`
         INSERT INTO pricing_config (id, "consultStandard", "consultPriority", "consultVip", "insuranceBasic", "insuranceStandard", "insurancePremium", "updatedAt")
         VALUES ('singleton', 15000, 25000, 50000, 25000, 45000, 80000, NOW())
@@ -153,9 +187,23 @@ async function start() {
         EXCEPTION WHEN duplicate_object THEN NULL;
         END $$;
       `);
-      console.log('Enum patched.');
+      await db.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id TEXT NOT NULL,
+          "actorId" TEXT NOT NULL,
+          action TEXT NOT NULL,
+          "targetId" TEXT,
+          meta JSONB,
+          "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+          CONSTRAINT audit_log_pkey PRIMARY KEY (id)
+        );
+        CREATE INDEX IF NOT EXISTS "audit_log_actorId_idx" ON audit_log("actorId");
+        CREATE INDEX IF NOT EXISTS "audit_log_action_idx" ON audit_log(action);
+        CREATE INDEX IF NOT EXISTS "audit_log_createdAt_idx" ON audit_log("createdAt");
+      `);
+      console.log('Schema patches applied.');
     } catch (e) {
-      console.error('Enum patch (non-fatal):', e.message);
+      console.error('Schema patch (non-fatal):', e.message);
     }
 
     console.log('Running database migrations...');
@@ -173,9 +221,9 @@ async function start() {
       where: { email: 'admin@jekafly.com' },
       create: {
         id: 'ADMIN001', name: 'Jekafly Admin', email: 'admin@jekafly.com',
-        phone: '+234 800 000 0001', passwordHash: adminHash, role: 'ADMIN'
+        phone: '+234 800 000 0001', passwordHash: adminHash, role: 'ADMIN', adminRole: 'super',
       },
-      update: { passwordHash: adminHash, role: 'ADMIN' },
+      update: { passwordHash: adminHash, role: 'ADMIN', adminRole: 'super' },
     });
 
     await db.serviceFee.upsert({

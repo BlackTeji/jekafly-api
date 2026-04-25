@@ -1,17 +1,27 @@
 require('dotenv').config();
 
+function requireEnv(name) {
+  const val = process.env[name];
+  if (!val) throw new Error(`Missing required environment variable: ${name}`);
+  return val;
+}
+
 module.exports = {
   port: process.env.PORT || 3000,
   nodeEnv: process.env.NODE_ENV || 'development',
   frontendUrl: (() => {
     let url = process.env.FRONTEND_URL || 'http://localhost:5500';
     if (url && !url.startsWith('http')) url = 'https://' + url;
-    return url.replace(/\/$/, ''); 
+    return url.replace(/\/$/, '');
   })(),
 
   jwt: {
-    accessSecret: process.env.JWT_ACCESS_SECRET || 'dev_access_secret',
-    refreshSecret: process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret',
+    accessSecret: process.env.NODE_ENV === 'production'
+      ? requireEnv('JWT_ACCESS_SECRET')
+      : (process.env.JWT_ACCESS_SECRET || (() => { console.warn('[WARN] JWT_ACCESS_SECRET not set — using insecure dev default'); return 'dev_access_secret_CHANGE_IN_PRODUCTION'; })()),
+    refreshSecret: process.env.NODE_ENV === 'production'
+      ? requireEnv('JWT_REFRESH_SECRET')
+      : (process.env.JWT_REFRESH_SECRET || 'dev_refresh_secret_CHANGE_IN_PRODUCTION'),
     accessExpires: process.env.JWT_ACCESS_EXPIRES || '15m',
     refreshExpires: process.env.JWT_REFRESH_EXPIRES || '30d',
   },

@@ -3,6 +3,11 @@ const crypto = require('crypto');
 const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 
+const safeProfileUrl = z.union([
+    z.string().url().refine(u => u.startsWith('https://'), { message: 'Profile URL must start with https://' }),
+    z.literal(''),
+    z.null(),
+]).optional();
 
 exports.apply = async (req, res, next) => {
     try {
@@ -13,7 +18,7 @@ exports.apply = async (req, res, next) => {
             location: z.string().optional(),
             channel: z.string().optional(),
             audienceSize: z.string().optional(),
-            profileUrl: z.union([z.string().url(), z.literal(''), z.null()]).optional(),
+            profileUrl: safeProfileUrl,
             motivation: z.string().nullable().optional(),
             bankAccount: z.string().min(10),
             bankName: z.string().min(2),
@@ -221,19 +226,20 @@ exports.magicLogin = async (req, res, next) => {
         const { generateAccessToken, generateRefreshToken, saveRefreshToken, setRefreshCookie } = require('../utils/jwt');
         const user = await prisma.user.findUnique({
             where: { id: record.userId },
-            select: { id: true, name: true, email: true, phone: true, role: true, adminRole: true },
+            select: { id: true, name: true, email: true, phone: true, role: true, adminRole: true, deletedAt: true },
         });
-        if (!user) return res.status(404).json({ ok: false, error: 'Account not found.' });
+        if (!user || user.deletedAt) return res.status(404).json({ ok: false, error: 'Account not found.' });
 
-        const accessToken = generateAccessToken(user.id, user.role);
+        const { deletedAt: _, ...safeUser } = user;
+        const accessToken = generateAccessToken(safeUser.id, safeUser.role);
         const refreshToken = generateRefreshToken();
-        await saveRefreshToken(user.id, refreshToken);
+        await saveRefreshToken(safeUser.id, refreshToken);
         setRefreshCookie(res, refreshToken);
 
         res.json({
             ok: true,
             data: {
-                user,
+                user: safeUser,
                 accessToken,
                 mustSetPassword: record.isNewUser,
                 isNewUser: record.isNewUser,
@@ -306,7 +312,6 @@ exports.getReferrals = async (req, res, next) => {
         res.json({ ok: true, data: { referrals } });
     } catch (err) { next(err); }
 };
-
 
 exports.adminGetAllPayouts = async (req, res, next) => {
     try {

@@ -9,17 +9,21 @@ const { generateAccessToken, generateRefreshToken, saveRefreshToken,
   setRefreshCookie, clearRefreshCookie } = require('../utils/jwt');
 const { emails, sendEmail } = require('../services/email');
 
+const normalizeEmail = (email) => email.toLowerCase().trim();
+
 const registerSchema = z.object({
-  name: z.string().min(2, 'Name must be at least 2 characters'),
-  email: z.string().email('Invalid email address'),
+  name: z.string().min(2, 'Name must be at least 2 characters').max(100).transform(v => v.replace(/<[^>]*>/g, '').trim()),
+  email: z.string().email('Invalid email address').transform(normalizeEmail),
   phone: z.string().optional(),
   password: z.string().min(8, 'Password must be at least 8 characters'),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().email().transform(normalizeEmail),
   password: z.string().min(1),
 });
+
+const generateOtp = () => String(crypto.randomInt(100000, 1000000)).padStart(6, '0');
 
 exports.register = async (req, res, next) => {
   try {
@@ -50,7 +54,7 @@ exports.login = async (req, res, next) => {
     const { email, password } = loginSchema.parse(req.body);
 
     const user = await prisma.user.findUnique({ where: { email } });
-    if (!user) throw new ApiError('Invalid email or password.', 401);
+    if (!user || user.deletedAt) throw new ApiError('Invalid email or password.', 401);
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) throw new ApiError('Invalid email or password.', 401);
@@ -70,6 +74,13 @@ exports.login = async (req, res, next) => {
 
 exports.refresh = async (req, res, next) => {
   try {
+    const origin = req.headers.origin;
+    const config = require('../config');
+    const allowed = [config.frontendUrl, 'http://localhost:5500', 'http://localhost:5506', 'http://127.0.0.1:5500', 'http://127.0.0.1:5506'].filter(Boolean);
+    if (origin && !allowed.includes(origin)) {
+      return res.status(403).json({ ok: false, error: 'Forbidden.' });
+    }
+
     const token = req.cookies?.jkf_refresh;
     if (!token) throw new ApiError('No refresh token.', 401);
 
@@ -78,9 +89,9 @@ exports.refresh = async (req, res, next) => {
 
     const user = await prisma.user.findUnique({
       where: { id: result.userId },
-      select: { id: true, role: true },
+      select: { id: true, role: true, deletedAt: true },
     });
-    if (!user) throw new ApiError('User not found.', 401);
+    if (!user || user.deletedAt) throw new ApiError('User not found.', 401);
 
     const accessToken = generateAccessToken(user.id, user.role);
     setRefreshCookie(res, result.newRefreshToken);
@@ -110,7 +121,7 @@ exports.me = async (req, res, next) => {
 exports.updateMe = async (req, res, next) => {
   try {
     const schema = z.object({
-      name: z.string().min(2).optional(),
+      name: z.string().min(2).max(100).transform(v => v.replace(/<[^>]*>/g, '').trim()).optional(),
       phone: z.string().optional(),
     });
     const { name, phone } = schema.parse(req.body);
@@ -124,12 +135,15 @@ exports.updateMe = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-const generateOtp = () => String(Math.floor(100000 + Math.random() * 900000));
-
 exports.requestPasswordOtp = async (req, res, next) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.id } });
     if (!user) throw new ApiError('User not found.', 404);
+
+    const existing = await prisma.otpToken.findUnique({ where: { key: user.id } });
+    if (existing && existing.expiresAt > new Date(Date.now() + 9 * 60 * 1000)) {
+      return res.json({ ok: true, data: { message: 'OTP already sent. Please check your email.' } });
+    }
 
     const otp = generateOtp();
     await prisma.otpToken.upsert({
@@ -143,7 +157,7 @@ exports.requestPasswordOtp = async (req, res, next) => {
       subject: 'Your Jekafly Password Change OTP',
       html: `
         <div style="font-family:'Plus Jakarta Sans',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#f7f8fc;border-radius:16px;">
-          <img src="https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png" style="height:36px;margin-bottom:24px;" />
+          <img src="https://jekafly.com/assets/images/JEKAFLY%20LOGO%20B-R%202.png" style="height:36px;margin-bottom:24px;" />
           <h2 style="color:#0a1f44;font-size:1.4rem;margin-bottom:8px;">Password Change Request</h2>
           <p style="color:#6b7280;font-size:0.9rem;margin-bottom:24px;">Use the OTP below to confirm your password change. It expires in <strong>10 minutes</strong>.</p>
           <div style="background:#0a1f44;color:#fff;font-size:2rem;font-weight:800;letter-spacing:.3em;text-align:center;padding:20px;border-radius:12px;margin-bottom:24px;">${otp}</div>
@@ -189,14 +203,12 @@ exports.changePassword = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-
-
 exports.forgotPassword = async (req, res, next) => {
   try {
-    const { email } = z.object({ email: z.string().email() }).parse(req.body);
+    const { email } = z.object({ email: z.string().email().transform(normalizeEmail) }).parse(req.body);
 
     const user = await prisma.user.findUnique({
-      where: { email: email.toLowerCase() },
+      where: { email },
       select: { id: true, name: true, email: true, deletedAt: true },
     });
 
@@ -204,10 +216,15 @@ exports.forgotPassword = async (req, res, next) => {
       return res.json({ ok: true, data: { message: 'If that email is registered, a reset code has been sent.' } });
     }
 
+    const existing = await prisma.otpToken.findUnique({ where: { key: email } });
+    if (existing && existing.expiresAt > new Date(Date.now() + 14 * 60 * 1000)) {
+      return res.json({ ok: true, data: { message: 'If that email is registered, a reset code has been sent.' } });
+    }
+
     const otp = generateOtp();
     await prisma.otpToken.upsert({
-      where: { key: email.toLowerCase() },
-      create: { key: email.toLowerCase(), otp, userId: user.id, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
+      where: { key: email },
+      create: { key: email, otp, userId: user.id, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
       update: { otp, userId: user.id, expiresAt: new Date(Date.now() + 15 * 60 * 1000) },
     });
 
@@ -216,7 +233,7 @@ exports.forgotPassword = async (req, res, next) => {
       subject: 'Reset your Jekafly password',
       html: `
         <div style="font-family:'Plus Jakarta Sans',sans-serif;max-width:480px;margin:0 auto;padding:32px 24px;background:#f7f8fc;border-radius:16px;">
-          <img src="https://jekafly-frontend-verz.vercel.app/assets/images/JEKAFLY%20LOGO%20B-R%202.png" style="height:36px;margin-bottom:24px;" />
+          <img src="https://jekafly.com/assets/images/JEKAFLY%20LOGO%20B-R%202.png" style="height:36px;margin-bottom:24px;" />
           <h2 style="color:#0a1f44;font-size:1.4rem;margin-bottom:8px;">Reset Your Password</h2>
           <p style="color:#6b7280;font-size:0.9rem;margin-bottom:24px;">Use the code below to reset your password. It expires in <strong>15 minutes</strong>.</p>
           <div style="background:#0a1f44;color:#fff;font-size:2rem;font-weight:800;letter-spacing:.3em;text-align:center;padding:20px;border-radius:12px;margin-bottom:24px;">${otp}</div>
@@ -233,18 +250,18 @@ exports.forgotPassword = async (req, res, next) => {
 exports.resetPassword = async (req, res, next) => {
   try {
     const { email, otp, newPassword } = z.object({
-      email: z.string().email(),
+      email: z.string().email().transform(normalizeEmail),
       otp: z.string().length(6),
       newPassword: z.string().min(8),
     }).parse(req.body);
 
-    const record = await prisma.otpToken.findUnique({ where: { key: email.toLowerCase() } });
+    const record = await prisma.otpToken.findUnique({ where: { key: email } });
 
     if (!record || record.otp !== otp || new Date() > record.expiresAt) {
       return res.status(400).json({ ok: false, error: 'Invalid or expired reset code.' });
     }
 
-    await prisma.otpToken.delete({ where: { key: email.toLowerCase() } }).catch(() => { });
+    await prisma.otpToken.delete({ where: { key: email } }).catch(() => { });
 
     const hash = await bcrypt.hash(newPassword, 12);
     await prisma.user.update({
@@ -305,11 +322,8 @@ exports.deleteAccount = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── POST /auth/set-password ──────────────────────────────────────────────────
 exports.setPassword = async (req, res, next) => {
   try {
-    const { z } = require('zod');
-    const bcrypt = require('bcryptjs');
     const { newPassword } = z.object({
       newPassword: z.string().min(8),
     }).parse(req.body);

@@ -5,6 +5,18 @@ const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 const { emails } = require('../services/email');
 
+async function auditLog(actorId, action, targetId, meta = {}) {
+  try {
+    await prisma.$executeRawUnsafe(
+      `INSERT INTO audit_log (id, "actorId", action, "targetId", meta, "createdAt")
+       VALUES (gen_random_uuid(), $1, $2, $3, $4::jsonb, NOW())`,
+      actorId, action, targetId, JSON.stringify(meta)
+    );
+  } catch (e) {
+    console.error('[AuditLog] Failed to write:', e.message);
+  }
+}
+
 exports.listApplications = async (req, res, next) => {
   try {
     const page = Math.max(1, parseInt(req.query.page) || 1);
@@ -41,7 +53,6 @@ exports.listApplications = async (req, res, next) => {
       total: all.length,
       pending: all.filter(a => ['RECEIVED', 'PROCESSING', 'EMBASSY'].includes(a.status)).length,
       approved: all.filter(a => ['APPROVED', 'DELIVERED'].includes(a.status)).length,
-
       revenue: all.filter(a => a.paid).reduce((s, a) => s + a.fee, 0) / 100,
     };
 
@@ -71,16 +82,15 @@ exports.updateStatus = async (req, res, next) => {
       include: { statusHistory: { orderBy: { createdAt: 'asc' } } },
     });
 
+    await auditLog(req.user.id, 'application.status_update', app.id, { status, note, ref: app.ref });
+
     const user = await prisma.user.findUnique({
       where: { id: app.userId },
       select: { name: true, email: true },
     });
     if (user) await emails.statusUpdated(updated, note, user).catch(() => { });
-
-    // SMS notification
     if (user?.phone) sms.statusUpdate(user.phone, user.name, updated.ref, updated.status).catch(() => { });
 
-    // Real-time push to client dashboard
     sse.sendToUser(app.userId, 'application:status', {
       ref: updated.ref,
       status: updated.status.toLowerCase(),
@@ -127,6 +137,10 @@ exports.listUsers = async (req, res, next) => {
 
 exports.updateRole = async (req, res, next) => {
   try {
+    if (req.user.adminRole !== 'super') {
+      return res.status(403).json({ ok: false, error: 'Only super admins can change user roles.' });
+    }
+
     const { role } = z.object({ role: z.enum(['USER', 'ADMIN']) }).parse(req.body);
 
     if (req.params.id === req.user.id && role === 'USER') {
@@ -137,17 +151,23 @@ exports.updateRole = async (req, res, next) => {
       where: { id: req.params.id },
       data: {
         role,
-
         ...(role === 'USER' && { adminRole: null }),
       },
       select: { id: true, name: true, email: true, role: true, adminRole: true },
     });
+
+    await auditLog(req.user.id, 'user.role_change', req.params.id, { newRole: role });
+
     res.json({ ok: true, data: { user } });
   } catch (err) { next(err); }
 };
 
 exports.updateAdminRole = async (req, res, next) => {
   try {
+    if (req.user.adminRole !== 'super') {
+      return res.status(403).json({ ok: false, error: 'Only super admins can change admin roles.' });
+    }
+
     const { adminRole } = z.object({
       adminRole: z.enum(['super', 'applications', 'finance', 'consultations', 'affiliates']),
     }).parse(req.body);
@@ -162,11 +182,11 @@ exports.updateAdminRole = async (req, res, next) => {
       select: { id: true, name: true, email: true, role: true, adminRole: true },
     });
 
+    await auditLog(req.user.id, 'user.admin_role_change', req.params.id, { newAdminRole: adminRole });
+
     res.json({ ok: true, data: { user } });
   } catch (err) { next(err); }
 };
-
-// ─── Payments (admin view) ────────────────────────────────────────────────────
 
 exports.getAllPayments = async (req, res, next) => {
   try {
@@ -194,7 +214,6 @@ exports.getAllPayments = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── Documents ────────────────────────────────────────────────────────────────
 exports.listDocuments = async (req, res, next) => {
   try {
     const ref = req.query.ref;
@@ -267,6 +286,10 @@ exports.getApplication = async (req, res, next) => {
 
 exports.deleteUser = async (req, res, next) => {
   try {
+    if (req.user.adminRole !== 'super') {
+      return res.status(403).json({ ok: false, error: 'Only super admins can delete users.' });
+    }
+
     const { id } = req.params;
 
     if (id === req.user.id) {
@@ -297,28 +320,24 @@ exports.deleteUser = async (req, res, next) => {
     });
 
     await prisma.refreshToken.deleteMany({ where: { userId: id } });
+    await auditLog(req.user.id, 'user.deleted', id, { email: user.email });
 
     res.json({ ok: true, data: { message: 'User deleted and data archived.' } });
   } catch (err) { next(err); }
 };
 
-// ─── Flight & Hotel bookings ──────────────────────────────────────────────────
-
 exports.listFlightBookings = async (req, res, next) => {
   try {
-    // TODO: replace with prisma.flightOrder.findMany() when model exists
     res.json({ ok: true, data: { orders: [], total: 0 } });
   } catch (err) { next(err); }
 };
 
 exports.listHotelBookings = async (req, res, next) => {
   try {
-    // TODO: replace with prisma.hotelReservation.findMany() when model exists
     res.json({ ok: true, data: { orders: [], total: 0 } });
   } catch (err) { next(err); }
 };
 
-// ─── Document streaming & ZIP ─────────────────────────────────────────────────
 exports.streamDocument = async (req, res, next) => {
   try {
     const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
@@ -339,13 +358,15 @@ exports.streamDocument = async (req, res, next) => {
       new GetObjectCommand({ Bucket: config.aws.bucket, Key: doc.key })
     );
 
+    const safeName = require('path').basename(doc.name).replace(/[^a-zA-Z0-9._\-\s]/g, '_');
     const disposition = req.query.download === '1'
-      ? `attachment; filename="${encodeURIComponent(doc.name)}"`
-      : `inline; filename="${encodeURIComponent(doc.name)}"`;
+      ? `attachment; filename="${encodeURIComponent(safeName)}"`
+      : `attachment; filename="${encodeURIComponent(safeName)}"`;
 
-    res.setHeader('Content-Type', ContentType || doc.mimeType || 'application/octet-stream');
+    res.setHeader('Content-Type', 'application/octet-stream');
     res.setHeader('Content-Disposition', disposition);
     res.setHeader('Cache-Control', 'private, max-age=300');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     if (ContentLength) res.setHeader('Content-Length', ContentLength);
 
     Body.pipe(res);
@@ -359,6 +380,7 @@ exports.downloadDocumentsZip = async (req, res, next) => {
 
     const archiver = require('archiver');
     const { S3Client, GetObjectCommand } = require('@aws-sdk/client-s3');
+    const path = require('path');
     const config = require('../config');
 
     const app = await prisma.application.findUnique({ where: { ref } });
@@ -393,7 +415,8 @@ exports.downloadDocumentsZip = async (req, res, next) => {
       if (!doc.key || doc.key.startsWith('local/')) continue;
       try {
         const { Body } = await s3.send(new GetObjectCommand({ Bucket: config.aws.bucket, Key: doc.key }));
-        archive.append(Body, { name: doc.name || `document-${doc.id}` });
+        const safeName = path.basename(doc.name || `document-${doc.id}`).replace(/[^a-zA-Z0-9._\-\s]/g, '_');
+        archive.append(Body, { name: safeName });
       } catch (err) {
         console.error(`[ZIP] Skipping doc ${doc.id}:`, err.message);
       }
@@ -403,7 +426,6 @@ exports.downloadDocumentsZip = async (req, res, next) => {
   } catch (err) { next(err); }
 };
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 const fmt = (app) => ({
   ...app,
   fee: app.fee / 100,

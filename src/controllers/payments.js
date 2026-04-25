@@ -79,12 +79,12 @@ exports.webhook = async (req, res, next) => {
   try {
     const signature = req.headers['x-paystack-signature'];
 
-    res.sendStatus(200);
-
     if (!paystack.validateWebhookSignature(req.body, signature)) {
-      console.error('[Webhook] Invalid signature — ignoring.');
-      return;
+      console.error('[Webhook] Invalid signature — rejecting.');
+      return res.sendStatus(400);
     }
+
+    res.sendStatus(200);
 
     const event = JSON.parse(req.body.toString());
 
@@ -137,15 +137,12 @@ async function handleChargeSuccess(data) {
 
     const user = await prisma.user.findUnique({
       where: { id: payment.userId },
-      select: { name: true, email: true },
+      select: { name: true, email: true, phone: true },
     });
     if (user) await emails.paymentConfirmed(app, payment, user, docCount > 0).catch(() => { });
     emails.adminPaymentConfirmed(app, payment, user).catch(() => { });
-
-    // SMS notification
     if (user?.phone) sms.paymentConfirmed(user.phone, user.name, app.ref, payment.amount / 100).catch(() => { });
 
-    // Real-time push to client dashboard
     if (app.userId) sse.sendToUser(app.userId, 'payment:confirmed', {
       ref: app.ref,
       amount: payment.amount / 100,
@@ -189,10 +186,6 @@ async function handleChargeSuccess(data) {
   }
 }
 
-// ─── Affiliate commission credit ──────────────────────────────────────────────
-// Rate: 8% of payment amount (kobo in, kobo out)
-// Self-referral guard: blocked if the applicant's passport number matches
-// any previous application submitted by the affiliate themselves.
 async function creditAffiliateCommission(app, amountKobo) {
   if (!app.referralCode) return;
 
@@ -201,19 +194,9 @@ async function creditAffiliateCommission(app, amountKobo) {
   });
   if (!affiliate || affiliate.status !== 'APPROVED') return;
 
-  // Self-referral guard — passport-based
-  if (app.passportNumber) {
-    const affiliatePriorApp = await prisma.application.findFirst({
-      where: {
-        userId: affiliate.userId,
-        passportNumber: app.passportNumber,
-      },
-      select: { id: true },
-    });
-    if (affiliatePriorApp) {
-      console.log(`[Affiliate] Self-referral blocked for code ${app.referralCode} (passport match).`);
-      return;
-    }
+  if (affiliate.userId && app.userId === affiliate.userId) {
+    console.log(`[Affiliate] Self-referral blocked (same account) for code ${app.referralCode}.`);
+    return;
   }
 
   const commission = Math.round(amountKobo * 0.08);
