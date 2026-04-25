@@ -21,20 +21,20 @@ async function main() {
   // Admin user — restore or create, always clearing deletedAt
   const adminHash = await bcrypt.hash('admin1234', 12);
   await prisma.user.upsert({
-    where: { id: 'ADMIN001' },
+    where: { id: 'KazWhale' },
     create: {
-      id: 'ADMIN001',
+      id: 'KazWhale',
       name: 'Jekafly Admin',
-      email: 'admin@jekafly.com',
-      phone: '+234 800 000 0001',
+      email: 'jekaflynigeria@gmail.com',
+      phone: '+234 8132132206',
       passwordHash: adminHash,
       role: 'ADMIN',
       deletedAt: null,
     },
     update: {
       name: 'Jekafly Admin',
-      email: 'admin@jekafly.com',
-      phone: '+234 800 000 0001',
+      email: 'jekaflynigeria@gmail.com',
+      phone: '+234 8132132206',
       passwordHash: adminHash,
       role: 'ADMIN',
       deletedAt: null,
@@ -60,7 +60,7 @@ async function main() {
   console.log(`✅ ${Object.keys(DEFAULT_FEES).length} destination fees seeded`);
 
   console.log('\n✅ Seed complete.');
-  console.log('   Admin login: admin@jekafly.com / admin1234');
+  console.log('   Admin login: jekaflynigeria@gmail.com / admin1234');
 }
 
 main()
