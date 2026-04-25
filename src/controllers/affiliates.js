@@ -134,7 +134,7 @@ exports.adminList = async (req, res, next) => {
     try {
         const affiliates = await prisma.affiliate.findMany({
             orderBy: { createdAt: 'desc' },
-            include: { payouts: { where: { status: 'PENDING' }, orderBy: { requestedAt: 'desc' } } },
+            include: { payouts: { orderBy: { requestedAt: 'desc' } } },
         });
         res.json({
             ok: true,
@@ -147,7 +147,8 @@ exports.adminList = async (req, res, next) => {
                     referralCode: a.referralCode, status: a.status.toLowerCase(),
                     totalClicks: a.totalClicks, totalReferrals: a.totalReferrals,
                     totalEarned: a.totalEarned / 100, totalPaid: a.totalPaid / 100, balance: a.balance / 100,
-                    pendingPayouts: a.payouts.map(fmtPayout), createdAt: a.createdAt,
+                    pendingPayouts: a.payouts.filter(p => p.status === 'PENDING').map(fmtPayout),
+                    allPayouts: a.payouts.map(fmtPayout), createdAt: a.createdAt,
                 })),
             },
         });
@@ -205,7 +206,7 @@ exports.adminProcessPayout = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// ─── Magic link: GET /auth/magic?token=xxx ────────────────────────────────────
+
 exports.magicLogin = async (req, res, next) => {
     try {
         const { token } = req.query;
@@ -242,7 +243,6 @@ exports.magicLogin = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-// ─── Internal: create account + magic link on affiliate approval ──────────────
 async function issueAffiliateAccount(affiliateId) {
     const bcrypt = require('bcryptjs');
     const { emails } = require('../services/email');
