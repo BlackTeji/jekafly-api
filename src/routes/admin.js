@@ -13,7 +13,6 @@ const bankVerifyLimit = rateLimit({
     standardHeaders: true, legacyHeaders: false,
 });
 
-// All admin routes require auth + admin role
 router.use(authenticate, requireAdmin);
 
 // ─── Applications ─────────────────────────────────────────────────────────────
@@ -41,6 +40,7 @@ router.get('/pageviews', pageviewsCtrl.getPageviews);
 
 // ─── Affiliates ───────────────────────────────────────────────────────────────
 router.get('/affiliates', affiliateCtrl.adminList);
+router.get('/affiliates/payouts', affiliateCtrl.adminGetAllPayouts);
 router.patch('/affiliates/payouts/:payoutId/process', affiliateCtrl.adminProcessPayout);
 router.patch('/affiliates/:id/status', affiliateCtrl.adminUpdateStatus);
 

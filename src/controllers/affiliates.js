@@ -206,7 +206,6 @@ exports.adminProcessPayout = async (req, res, next) => {
     } catch (err) { next(err); }
 };
 
-
 exports.magicLogin = async (req, res, next) => {
     try {
         const { token } = req.query;
@@ -305,6 +304,26 @@ exports.getReferrals = async (req, res, next) => {
         }));
 
         res.json({ ok: true, data: { referrals } });
+    } catch (err) { next(err); }
+};
+
+
+exports.adminGetAllPayouts = async (req, res, next) => {
+    try {
+        const payouts = await prisma.affiliatePayout.findMany({
+            orderBy: { requestedAt: 'desc' },
+            include: { affiliate: { select: { name: true, email: true } } },
+        });
+        res.json({
+            ok: true,
+            data: {
+                payouts: payouts.map(p => ({
+                    ...fmtPayout(p),
+                    affiliateName: p.affiliate?.name || '',
+                    affiliateEmail: p.affiliate?.email || '',
+                })),
+            },
+        });
     } catch (err) { next(err); }
 };
 
