@@ -218,10 +218,10 @@ async function start() {
 
     const adminHash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'admin1234', 12);
     await db.user.upsert({
-      where: { email: 'admin@jekafly.com' },
-      create: {
-        id: 'ADMIN001', name: 'Jekafly Admin', email: 'admin@jekafly.com',
-        phone: '+234 800 000 0001', passwordHash: adminHash, role: 'ADMIN', adminRole: 'super',
+     where: { email: 'jekaflynigeria@gmail.com' },
+create: {
+  id: 'KazWhale', name: 'Jekafly Admin', email: 'jekaflynigeria@gmail.com',
+        phone: '+234 8132132206', passwordHash: adminHash, role: 'ADMIN', adminRole: 'super',
       },
       update: { passwordHash: adminHash, role: 'ADMIN', adminRole: 'super' },
     });
