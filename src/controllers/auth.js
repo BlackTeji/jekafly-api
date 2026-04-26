@@ -76,7 +76,14 @@ exports.refresh = async (req, res, next) => {
   try {
     const origin = req.headers.origin;
     const config = require('../config');
-    const allowed = [config.frontendUrl, 'http://localhost:5500', 'http://localhost:5506', 'http://127.0.0.1:5500', 'http://127.0.0.1:5506'].filter(Boolean);
+    const allowed = [
+      config.frontendUrl,
+      config.frontendUrl ? config.frontendUrl.replace('https://', 'https://www.') : null,
+      'http://localhost:5500',
+      'http://localhost:5506',
+      'http://127.0.0.1:5500',
+      'http://127.0.0.1:5506',
+    ].filter(Boolean);
     if (origin && !allowed.includes(origin)) {
       return res.status(403).json({ ok: false, error: 'Forbidden.' });
     }
