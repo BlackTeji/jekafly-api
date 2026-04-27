@@ -59,7 +59,7 @@ app.use(helmet({
       ],
       connectSrc: ["'self'", 'https://api.paystack.co'],
       imgSrc: ["'self'", 'data:', 'https:'],
-      frameSrc: ["'none'"],
+      frameSrc: ["'self'"],
       objectSrc: ["'none'"],
       baseUri: ["'self'"],
       formAction: ["'self'"],
