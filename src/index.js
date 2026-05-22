@@ -57,7 +57,7 @@ app.use(helmet({
         "'self'",
         'https://fonts.gstatic.com',
       ],
-      connectSrc: ["'self'", 'https://api.paystack.co'],
+      connectSrc: ["'self'", 'https://api.paystack.co', 'https://api.jekafly.com'],
       imgSrc: ["'self'", 'data:', 'https:'],
       frameSrc: ["'self'"],
       objectSrc: ["'none'"],
