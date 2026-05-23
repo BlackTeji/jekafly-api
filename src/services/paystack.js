@@ -39,9 +39,10 @@ const verifyTransaction = async (reference) => {
 
 // Validate webhook signature
 const validateWebhookSignature = (rawBody, signature) => {
-  if (!config.paystack.webhookSecret) return false;
+  const secret = config.paystack.webhookSecret || config.paystack.secretKey;
+  if (!secret) return false;
   const hash = crypto
-    .createHmac('sha512', config.paystack.webhookSecret)
+    .createHmac('sha512', secret)
     .update(rawBody)
     .digest('hex');
   return hash === signature;
