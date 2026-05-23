@@ -223,6 +223,30 @@ exports.verify = async (req, res, next) => {
 
     const verified = await paystack.verifyTransaction(reference);
 
+    if (verified.status === 'success' && payment.status !== 'SUCCESS') {
+      await prisma.payment.update({
+        where: { reference },
+        data: { status: 'SUCCESS', paidAt: new Date() },
+      });
+
+      if (payment.type === 'VISA' && payment.applicationId) {
+        await prisma.application.update({
+          where: { id: payment.applicationId },
+          data: {
+            paid: true,
+            fee: payment.amount,
+            status: 'PROCESSING',
+            statusHistory: {
+              create: {
+                status: 'PROCESSING',
+                note: 'Payment confirmed via verification.',
+              },
+            },
+          },
+        });
+      }
+    }
+
     let appRef = null;
     if (payment.applicationId) {
       const app = await prisma.application.findUnique({
