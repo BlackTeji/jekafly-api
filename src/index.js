@@ -48,7 +48,6 @@ app.use(helmet({
         'https://js.paystack.co',
         'https://fonts.googleapis.com',
         'https://paystack.com',
-        'https://assets.calendly.com',
         'https://app.cal.com',
       ],
       styleSrc: [
@@ -56,7 +55,6 @@ app.use(helmet({
         "'unsafe-inline'",
         'https://fonts.googleapis.com',
         'https://paystack.com',
-        'https://assets.calendly.com',
       ],
       fontSrc: [
         "'self'",
@@ -67,8 +65,6 @@ app.use(helmet({
         'https://api.paystack.co',
         'https://paystack.com',
         'https://api.jekafly.com',
-        'https://calendly.com',
-        'https://*.calendly.com',
         'https://app.cal.com',
         'https://*.cal.com',
       ],
@@ -77,8 +73,6 @@ app.use(helmet({
         "'self'",
         'blob:',
         'https://checkout.paystack.com',
-        'https://calendly.com',
-        'https://*.calendly.com',
         'https://app.cal.com',
         'https://*.cal.com',
       ],
