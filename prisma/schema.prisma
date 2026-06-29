@@ -15,16 +15,18 @@ model User {
   phone        String?
   passwordHash String
   role         Role          @default(USER)
-  adminRole    String?       // granular admin access: super|applications|finance|consultations|affiliates
-  deletedAt    DateTime?     // soft-delete timestamp
+  adminRole    String?
+  deletedAt    DateTime?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
 
-  applications Application[]
-  documents    Document[]
-  payments     Payment[]
-  policies     InsurancePolicy[]
-  refreshTokens RefreshToken[]
+  applications    Application[]
+  documents       Document[]
+  payments        Payment[]
+  policies        InsurancePolicy[]
+  refreshTokens   RefreshToken[]
+  holidayBookings HolidayBooking[]
+  clubMembership  ClubMembership?
 
   @@map("users")
 }
@@ -50,51 +52,46 @@ model RefreshToken {
 
 // ─── Applications ─────────────────────────────────────────────────────────────
 model Application {
-  id              String            @id @default(uuid())
-  ref             String            @unique
-  userId          String
-  user            User              @relation(fields: [userId], references: [id])
+  id                String            @id @default(uuid())
+  ref               String            @unique
+  userId            String
+  user              User              @relation(fields: [userId], references: [id])
 
-  // Trip details
-  destination     String
-  purpose         String
-  visaType        String?
-  travelDate      DateTime?
-  returnDate      DateTime?
+  destination       String
+  purpose           String
+  visaType          String?
+  travelDate        DateTime?
+  returnDate        DateTime?
 
-  // Applicant details
-  applicantName   String
-  email           String
-  phone           String?
-  nationality     String?
-  passportNumber  String?
-  passportExpiry  DateTime?
+  applicantName     String
+  email             String
+  phone             String?
+  nationality       String?
+  passportNumber    String?
+  passportExpiry    DateTime?
   passportIssueDate DateTime?
-  dob             DateTime?
+  dob               DateTime?
 
-  // Referral & agent
-  referralCode    String?
-  agentSubmitted  Boolean           @default(false)
+  referralCode      String?
+  agentSubmitted    Boolean           @default(false)
 
-  // Status & payment
-  status          ApplicationStatus @default(RECEIVED)
-  paid            Boolean           @default(false)
-  fee             Int               @default(0)  // in kobo
+  status            ApplicationStatus @default(RECEIVED)
+  paid              Boolean           @default(false)
+  fee               Int               @default(0)
 
-  // JSON fields
-  feeBreakdown    Json?
-  travellers      Json?
+  feeBreakdown      Json?
+  travellers        Json?
 
-  deliveredAt     DateTime?         // when status was set to DELIVERED
-  deletedAt       DateTime?         // set when user is deleted
-  archivedUserId  String?            // preserves userId after user record wiped
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  deliveredAt       DateTime?
+  deletedAt         DateTime?
+  archivedUserId    String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
-  statusHistory   StatusHistory[]
-  documents       Document[]
-  payments        Payment[]
-  review          Review?
+  statusHistory     StatusHistory[]
+  documents         Document[]
+  payments          Payment[]
+  review            Review?
 
   @@index([userId])
   @@index([status])
@@ -114,12 +111,12 @@ enum ApplicationStatus {
 }
 
 model StatusHistory {
-  id            String      @id @default(uuid())
+  id            String            @id @default(uuid())
   applicationId String
-  application   Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  application   Application       @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   status        ApplicationStatus
   note          String
-  createdAt     DateTime    @default(now())
+  createdAt     DateTime          @default(now())
 
   @@index([applicationId])
   @@index([createdAt])
@@ -128,19 +125,19 @@ model StatusHistory {
 
 // ─── Documents ───────────────────────────────────────────────────────────────
 model Document {
-  id            String      @id @default(uuid())
+  id            String       @id @default(uuid())
   userId        String
-  user          User        @relation(fields: [userId], references: [id])
+  user          User         @relation(fields: [userId], references: [id])
   applicationId String?
   application   Application? @relation(fields: [applicationId], references: [id])
 
   name          String
-  key           String      // S3 object key
+  key           String
   mimeType      String
-  size          Int         // bytes
-  docIndex      Int?        // position in visa requirements doc list
+  size          Int
+  docIndex      Int?
 
-  uploadedAt    DateTime    @default(now())
+  uploadedAt    DateTime @default(now())
 
   @@index([userId])
   @@index([applicationId])
@@ -155,13 +152,13 @@ model Payment {
   applicationId String?
   application   Application?  @relation(fields: [applicationId], references: [id])
 
-  reference     String        @unique  // Paystack reference
+  reference     String        @unique
   type          PaymentType
-  amount        Int           // kobo
+  amount        Int
   status        PaymentStatus @default(INITIATED)
   metadata      Json?
 
-  initiatedAt   DateTime      @default(now())
+  initiatedAt   DateTime @default(now())
   paidAt        DateTime?
 
   @@index([applicationId])
@@ -176,6 +173,8 @@ enum PaymentType {
   CONSULTATION
   FLIGHT
   HOTEL
+  HOLIDAY
+  CLUB_MEMBERSHIP
 }
 
 enum PaymentStatus {
@@ -195,7 +194,7 @@ model InsurancePolicy {
   destination String?
   travelDate  DateTime?
   travellers  Int      @default(1)
-  amount      Int      // kobo
+  amount      Int
   status      String   @default("active")
 
   purchasedAt DateTime @default(now())
@@ -205,51 +204,50 @@ model InsurancePolicy {
 
 // ─── Fees ────────────────────────────────────────────────────────────────────
 model Fee {
-  id          String   @id @default(uuid())
-  country     String   @unique
-  amount      Int      // naira
-  isDefault   Boolean  @default(false)
-  enabled     Boolean  @default(true)
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(uuid())
+  country   String   @unique
+  amount    Int
+  isDefault Boolean  @default(false)
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
 
   @@map("fees")
 }
 
 model ServiceFee {
   id        String   @id @default("singleton")
-  amount    Int      @default(25000)  // naira
+  amount    Int      @default(25000)
   updatedAt DateTime @updatedAt
 
   @@map("service_fee")
 }
 
 model PricingConfig {
-  id                    String   @id @default("singleton")
-  // Consultation packages (naira)
-  consultStandard       Int      @default(15000)
-  consultPriority       Int      @default(25000)
-  consultVip            Int      @default(50000)
-  // Insurance plans (naira, per person)
-  insuranceBasic        Int      @default(25000)
-  insuranceStandard     Int      @default(45000)
-  insurancePremium      Int      @default(80000)
-  processingFeePercent  Int      @default(5)        // % added on payment page
-  updatedAt             DateTime @updatedAt
+  id                   String   @id @default("singleton")
+  consultStandard      Int      @default(15000)
+  consultPriority      Int      @default(25000)
+  consultVip           Int      @default(50000)
+  insuranceBasic       Int      @default(25000)
+  insuranceStandard    Int      @default(45000)
+  insurancePremium     Int      @default(80000)
+  processingFeePercent Int      @default(5)
+  clubMembershipFee    Int      @default(150000)
+  updatedAt            DateTime @updatedAt
 
   @@map("pricing_config")
 }
 
 // ─── Visa Requirements ───────────────────────────────────────────────────────
 model VisaRequirement {
-  id          String   @id @default(uuid())
-  country     String   @unique
-  flag        String?
-  region      String?
-  visaType    String?
-  fee         String?  // display string e.g. "€80"
-  processing  String?  // display string e.g. "10-15 business days"
-  docs        Json?    // string[]
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  country    String   @unique
+  flag       String?
+  region     String?
+  visaType   String?
+  fee        String?
+  processing String?
+  docs       Json?
+  updatedAt  DateTime @updatedAt
 
   @@map("visa_requirements")
 }
@@ -257,19 +255,19 @@ model VisaRequirement {
 // ─── Reviews ─────────────────────────────────────────────────────────────────
 model Review {
   id             String   @id @default(uuid())
-  applicationRef String   @unique  // one review per application
+  applicationRef String   @unique
   userId         String?
-  name           String            // display name (can be partial)
+  name           String
   destination    String
-  rating         Int               // 1-5
+  rating         Int
   text           String
   approved       Boolean  @default(false)
-  surveyToken    String   @unique  // one-time token from email link
+  surveyToken    String   @unique
   surveyUsed     Boolean  @default(false)
-  surveysentAt   DateTime?         // when survey email was sent
+  surveysentAt   DateTime?
   createdAt      DateTime @default(now())
 
-  application    Application @relation(fields: [applicationRef], references: [ref])
+  application Application @relation(fields: [applicationRef], references: [ref])
 
   @@index([approved])
   @@index([userId])
@@ -278,37 +276,34 @@ model Review {
 
 // ─── Affiliates ───────────────────────────────────────────────────────────────
 model Affiliate {
-  id            String           @id @default(uuid())
-  userId        String?          // linked user account (optional — public can apply)
-  name          String
-  email         String           @unique
-  phone         String
-  location      String?
-  channel       String?          // promotion channel e.g. social_media
-  audienceSize  String?          // e.g. 1k_5k
-  profileUrl    String?
-  motivation    String?
+  id           String          @id @default(uuid())
+  userId       String?
+  name         String
+  email        String          @unique
+  phone        String
+  location     String?
+  channel      String?
+  audienceSize String?
+  profileUrl   String?
+  motivation   String?
 
-  // Bank details for payouts
-  bankAccount   String
-  bankName      String
-  accountName   String
+  bankAccount  String
+  bankName     String
+  accountName  String
 
-  // Referral
-  referralCode  String           @unique
-  status        AffiliateStatus  @default(PENDING)
+  referralCode String          @unique
+  status       AffiliateStatus @default(PENDING)
 
-  // Stats
-  totalClicks      Int  @default(0)
-  totalReferrals   Int  @default(0)
-  totalEarned      Int  @default(0)   // kobo
-  totalPaid        Int  @default(0)   // kobo
-  balance          Int  @default(0)   // kobo — earned minus paid
+  totalClicks    Int @default(0)
+  totalReferrals Int @default(0)
+  totalEarned    Int @default(0)
+  totalPaid      Int @default(0)
+  balance        Int @default(0)
 
-  payouts       AffiliatePayout[]
+  payouts AffiliatePayout[]
 
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@index([userId])
   @@index([status])
@@ -322,19 +317,19 @@ enum AffiliateStatus {
 }
 
 model AffiliatePayout {
-  id            String          @id @default(uuid())
+  id            String       @id @default(uuid())
   affiliateId   String
-  affiliate     Affiliate       @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
+  affiliate     Affiliate    @relation(fields: [affiliateId], references: [id], onDelete: Cascade)
 
-  amount        Int             // kobo
-  status        PayoutStatus    @default(PENDING)
+  amount        Int
+  status        PayoutStatus @default(PENDING)
   bankName      String
   accountNumber String
   accountName   String
   note          String?
 
-  requestedAt   DateTime @default(now())
-  processedAt   DateTime?
+  requestedAt DateTime @default(now())
+  processedAt DateTime?
 
   @@index([affiliateId])
   @@index([status])
@@ -346,7 +341,7 @@ enum PayoutStatus {
   PROCESSED
 }
 
-// ─── Magic Tokens (affiliate dashboard access) ────────────────────────────────
+// ─── Magic Tokens ────────────────────────────────────────────────────────────
 model MagicToken {
   id        String   @id @default(uuid())
   token     String   @unique
@@ -358,12 +353,12 @@ model MagicToken {
   @@map("magic_tokens")
 }
 
-// ─── OTP Tokens (password change / reset) ────────────────────────────────────
+// ─── OTP Tokens ──────────────────────────────────────────────────────────────
 model OtpToken {
   id        String   @id @default(uuid())
-  key       String   @unique  // userId for change-password, email for forgot-password
+  key       String   @unique
   otp       String
-  userId    String?           // set for reset-password flow
+  userId    String?
   expiresAt DateTime
   createdAt DateTime @default(now())
 
@@ -377,8 +372,8 @@ model PageView {
   referrer    String?
   sessionId   String?
   userId      String?
-  duration    Int?     // seconds on page
-  scrollDepth Int?     // 0-100 percent
+  duration    Int?
+  scrollDepth Int?
   ip          String?
   userAgent   String?
   createdAt   DateTime @default(now())
@@ -388,4 +383,143 @@ model PageView {
   @@index([createdAt])
   @@index([userId])
   @@map("page_views")
+}
+
+// ─── Holidays ────────────────────────────────────────────────────────────────
+model Holiday {
+  id               String        @id @default(uuid())
+  region           String
+  state            String
+  packageName      String
+  tagline          String
+  tier             HolidayTier
+  durationDays     Int
+  durationNights   Int
+  priceExplorer    Int?
+  priceSignature   Int?
+  priceExecutive   Int?
+  experienceType   String
+  attractions      Json
+  inclusions       Json
+  images           Json          @default("[]")
+  status           HolidayStatus @default(ACTIVE)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  dates            HolidayDate[]
+  bookings         HolidayBooking[]
+
+  @@unique([state, packageName])
+  @@index([region])
+  @@index([tier])
+  @@index([status])
+  @@map("holidays")
+}
+
+enum HolidayTier {
+  EXPLORER
+  SIGNATURE
+  EXECUTIVE
+}
+
+enum HolidayStatus {
+  ACTIVE
+  DRAFT
+  ARCHIVED
+}
+
+model HolidayDate {
+  id          String   @id @default(uuid())
+  holidayId   String
+  holiday     Holiday  @relation(fields: [holidayId], references: [id], onDelete: Cascade)
+  date        DateTime
+  capacity    Int      @default(20)
+  bookedCount Int      @default(0)
+  createdAt   DateTime @default(now())
+
+  bookings HolidayBooking[]
+
+  @@index([holidayId])
+  @@index([date])
+  @@map("holiday_dates")
+}
+
+model HolidayBooking {
+  id              String               @id @default(uuid())
+  ref             String               @unique
+  userId          String
+  user            User                 @relation(fields: [userId], references: [id])
+  holidayId       String
+  holiday         Holiday              @relation(fields: [holidayId], references: [id])
+  holidayDateId   String
+  holidayDate     HolidayDate          @relation(fields: [holidayDateId], references: [id])
+
+  tier            HolidayTier
+  travellers      Int
+  leadName        String
+  leadEmail       String
+  leadPhone       String?
+
+  tierAmount      Int
+  membershipAdded Boolean              @default(false)
+  membershipAmount Int                 @default(0)
+  totalAmount     Int
+
+  status          HolidayBookingStatus @default(PENDING)
+  paymentRef      String?              @unique
+  paidAt          DateTime?
+
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([holidayId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("holiday_bookings")
+}
+
+enum HolidayBookingStatus {
+  PENDING
+  CONFIRMED
+  CANCELLED
+}
+
+// ─── Travel Club ─────────────────────────────────────────────────────────────
+model ClubMembership {
+  id          String               @id @default(uuid())
+  userId      String               @unique
+  user        User                 @relation(fields: [userId], references: [id])
+
+  status      ClubMembershipStatus @default(ACTIVE)
+  startDate   DateTime             @default(now())
+  expiryDate  DateTime
+  amountPaid  Int
+  paymentRef  String               @unique
+
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([userId])
+  @@index([status])
+  @@index([expiryDate])
+  @@map("club_memberships")
+}
+
+enum ClubMembershipStatus {
+  ACTIVE
+  EXPIRED
+  CANCELLED
+}
+
+model ClubPerk {
+  id          String   @id @default(uuid())
+  title       String   @unique
+  description String
+  icon        String?
+  sortOrder   Int      @default(0)
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@map("club_perks")
 }

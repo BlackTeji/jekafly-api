@@ -181,6 +181,8 @@ app.use('/api/v1/hotels', hotelRoutes);
 app.use('/api/v1/bank', bankRoutes);
 app.use('/api/v1/events', require('./routes/events'));
 app.use('/api/v1/track', require('./routes/track'));
+app.use('/api/v1/holidays', require('./routes/holidays'));
+app.use('/api/v1/club', require('./routes/club'));
 
 app.use(notFound);
 app.use(errorHandler);
@@ -203,8 +205,8 @@ async function start() {
       await db.$executeRawUnsafe(`ALTER TABLE users ADD COLUMN IF NOT EXISTS "adminRole" TEXT;`);
       await db.$executeRawUnsafe(`ALTER TABLE pricing_config ADD COLUMN IF NOT EXISTS "processingFeePercent" INTEGER NOT NULL DEFAULT 5;`);
       await db.$executeRawUnsafe(`
-        INSERT INTO pricing_config (id, "consultStandard", "consultPriority", "consultVip", "insuranceBasic", "insuranceStandard", "insurancePremium", "updatedAt")
-        VALUES ('singleton', 15000, 25000, 50000, 25000, 45000, 80000, NOW())
+        INSERT INTO pricing_config (id, "consultStandard", "consultPriority", "consultVip", "insuranceBasic", "insuranceStandard", "clubMembershipFee", "insurancePremium", "updatedAt")
+        VALUES ('singleton', 15000, 25000, 50000, 25000, 45000, 80000, 150000, NOW())
         ON CONFLICT (id) DO NOTHING;
       `);
       await db.$executeRawUnsafe(`
@@ -275,6 +277,348 @@ async function start() {
         where: { country }, create: { country, amount, isDefault: true }, update: {},
       });
     }
+
+    // ─── Holiday & Club seed ─────────────────────────────────────────────────────
+
+    const CLUB_PERKS = [
+      { title: 'Early Access to Travel Deals', description: 'Be first to know about flash sales and exclusive travel deals before they go public.', icon: 'tag', sortOrder: 1 },
+      { title: 'Vacation Package Discounts', description: 'Members receive exclusive discounts on all Jekafly holiday packages.', icon: 'percent', sortOrder: 2 },
+      { title: 'Visa Assistance & Document Support', description: 'Priority visa consultation and document review for your travel plans.', icon: 'file-check', sortOrder: 3 },
+      { title: 'Personalised Itinerary Planning', description: 'Tailored travel itineraries crafted to your preferences and schedule.', icon: 'map', sortOrder: 4 },
+      { title: 'Airport Lounge Access', description: 'Complimentary access to partner airport lounges across Nigeria and select international airports.', icon: 'building', sortOrder: 5 },
+      { title: 'Lounge Guest Passes', description: 'Bring a guest into the lounge — members receive guest passes each membership year.', icon: 'users', sortOrder: 6 },
+      { title: '24/7 Concierge Service', description: 'Round-the-clock personal concierge for bookings, reservations, and travel support.', icon: 'headphones', sortOrder: 7 },
+      { title: 'Entertainment Discounts', description: 'Exclusive discounts on events, shows, experiences, and backstage access through Jekafly partners.', icon: 'ticket', sortOrder: 8 },
+    ];
+
+    await db.clubPerk.createMany({ data: CLUB_PERKS, skipDuplicates: true });
+
+    const HOLIDAYS = [
+      // ── Southwest ──────────────────────────────────────────────────────────────
+      {
+        region: 'Southwest', state: 'Lagos State', packageName: 'The Eko Experience',
+        tagline: 'Where Energy Meets Luxury', tier: 'SIGNATURE',
+        durationDays: 2, durationNights: 1, priceSignature: 350000,
+        experienceType: 'Urban Lifestyle, Entertainment, Beaches, Nightlife',
+        attractions: ['Boat Cruise Experience', 'Beach Day Out', 'Art Gallery Visit', 'Blue Line Rail Experience', 'Nightlife Experience in Lekki & Victoria Island', 'Restaurant Fine Dining'],
+        inclusions: ['Daily Breakfast', 'Hotel Accommodation', 'Intercity Transfer and local movement', 'Curated Destination Guide', 'Access to listed Attractions', 'Branded Travel Pack'],
+      },
+      {
+        region: 'Southwest', state: 'Ogun State', packageName: 'Gateway Trails',
+        tagline: 'Discover Heritage Beyond the Horizon', tier: 'EXPLORER',
+        durationDays: 2, durationNights: 1, priceExplorer: 280000,
+        experienceType: 'Heritage, Culture, Nature, Adventure',
+        attractions: ['Rock Climbing Adventure', 'Adire Market Experience', 'OOPL Wildlife Park', 'Cultural City Tours'],
+        inclusions: ['Daily Breakfast', 'Hotel Accommodation', 'Intercity Transfer and local movement', 'Curated Destination Guide', 'Access to listed Attractions', 'Branded Travel Pack'],
+      },
+      {
+        region: 'Southwest', state: 'Oyo State', packageName: 'The Alaafin Legacy',
+        tagline: 'Walk Through the Kingdom of Legends', tier: 'EXPLORER',
+        durationDays: 2, durationNights: 2, priceExplorer: 280000,
+        experienceType: 'Royal Heritage, History, Food & Culture',
+        attractions: ['Ibadan City Tour', 'Agodi Gardens', 'Heritage Sites', 'Local Cuisine Experience'],
+        inclusions: ['Daily Breakfast', 'Hotel Accommodation', 'Intercity Transfer and local movement', 'Curated Destination Guide', 'Access to listed Attractions', 'Branded Travel Pack'],
+      },
+      {
+        region: 'Southwest', state: 'Ondo State', packageName: 'Sunrise Coast Escape',
+        tagline: 'Where Nature Meets Serenity', tier: 'EXECUTIVE',
+        durationDays: 3, durationNights: 2, priceExecutive: 300000,
+        experienceType: 'Nature, Adventure, Wellness',
+        attractions: ['Idanre Hills', 'Coastal Exploration', 'Eco-Tourism Trails', 'Nature Retreat'],
+        inclusions: ['Daily Breakfast', 'Hotel Accommodation', 'Intercity Transfer and local movement', 'Curated Destination Guide', 'Access to listed Attractions', 'Branded Travel Pack'],
+      },
+      {
+        region: 'Southwest', state: 'Osun State', packageName: 'Sacred Osun Journey',
+        tagline: 'Experience the Spirit of Heritage', tier: 'EXPLORER',
+        durationDays: 2, durationNights: 1, priceExplorer: 280000,
+        experienceType: 'Spiritual Tourism, Heritage, Culture',
+        attractions: ['Osun Sacred Grove', 'Ile-Ife Heritage Tour', 'Cultural Village Experience'],
+        inclusions: ['Daily Breakfast', 'Hotel Accommodation', 'Intercity Transfer and local movement', 'Curated Destination Guide', 'Access to listed Attractions', 'Branded Travel Pack'],
+      },
+      {
+        region: 'Southwest', state: 'Ekiti State', packageName: 'The Hidden Gem Escape',
+        tagline: "Discover Nigeria's Best-Kept Secret", tier: 'EXECUTIVE',
+        durationDays: 3, durationNights: 2, priceExecutive: 300000,
+        experienceType: 'Eco-Tourism, Wellness, Adventure',
+        attractions: ['Ikogosi Warm Springs', 'Arinta Waterfalls', 'Hiking & Nature Exploration'],
+        inclusions: ['Daily Breakfast', 'Hotel Accommodation', 'Intercity Transfer and local movement', 'Curated Destination Guide', 'Access to listed Attractions', 'Branded Travel Pack'],
+      },
+      // ── South-South ────────────────────────────────────────────────────────────
+      {
+        region: 'South-South', state: 'Akwa Ibom State', packageName: 'The Ibom Escape',
+        tagline: 'Where Hospitality Meets Paradise', tier: 'SIGNATURE',
+        durationDays: 3, durationNights: 2, priceSignature: 320000,
+        experienceType: 'Coastal Luxury',
+        attractions: ['Ibeno Beach', 'Ibom Plaza', 'Raffia City Tour'],
+        inclusions: ['Hotel Accommodation', 'Daily Breakfast', 'Transfers', 'Tour Guide', 'Attraction Access'],
+      },
+      {
+        region: 'South-South', state: 'Cross River State', packageName: 'The Calabar Discovery',
+        tagline: "Experience Nigeria's Tourism Capital", tier: 'SIGNATURE',
+        durationDays: 4, durationNights: 3, priceSignature: 380000,
+        experienceType: 'Culture & Nature',
+        attractions: ['Obudu Mountain Resort', 'Tinapa', 'Marina Resort'],
+        inclusions: ['Hotel Accommodation', 'Daily Breakfast', 'Transfers', 'Tour Guide', 'Attraction Access'],
+      },
+      {
+        region: 'South-South', state: 'Rivers State', packageName: 'Garden City Prestige',
+        tagline: 'Business Meets Lifestyle', tier: 'SIGNATURE',
+        durationDays: 3, durationNights: 2, priceSignature: 350000,
+        experienceType: 'Urban Lifestyle',
+        attractions: ['Port Harcourt City Tour', 'Pleasure Park', 'Nightlife'],
+        inclusions: ['Hotel Accommodation', 'Daily Breakfast', 'Transfers', 'Tour Guide'],
+      },
+      {
+        region: 'South-South', state: 'Bayelsa State', packageName: 'Creeks & Culture Experience',
+        tagline: 'Discover the Heart of the Delta', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 280000,
+        experienceType: 'Eco & Cultural Tourism',
+        attractions: ['Oxbow Lake', 'Creek Excursions'],
+        inclusions: ['Hotel Accommodation', 'Boat Transfers', 'Tour Guide'],
+      },
+      {
+        region: 'South-South', state: 'Delta State', packageName: 'Delta Heritage Trail',
+        tagline: 'Where Tradition Meets Modernity', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 300000,
+        experienceType: 'Heritage & Lifestyle',
+        attractions: ['Nana Living History Museum', 'Asaba City Tour'],
+        inclusions: ['Hotel Accommodation', 'Transfers', 'Tour Guide'],
+      },
+      {
+        region: 'South-South', state: 'Edo State', packageName: 'Benin Kingdom Legacy',
+        tagline: 'Walk Through a Timeless Empire', tier: 'SIGNATURE',
+        durationDays: 3, durationNights: 2, priceSignature: 330000,
+        experienceType: 'Royal Heritage',
+        attractions: ['Benin Moat', 'National Museum', 'Palace District'],
+        inclusions: ['Hotel Accommodation', 'Daily Breakfast', 'Transfers', 'Tour Guide'],
+      },
+      // ── Southeast ──────────────────────────────────────────────────────────────
+      {
+        region: 'Southeast', state: 'Anambra State', packageName: 'The Light of the Nation Experience',
+        tagline: 'Discover Enterprise & Heritage', tier: 'SIGNATURE',
+        durationDays: 3, durationNights: 2, priceSignature: 300000,
+        experienceType: 'Culture & Commerce',
+        attractions: ['Ogbunike Cave', 'Onitsha Experience'],
+        inclusions: ['Hotel Accommodation', 'Daily Breakfast', 'Transfers'],
+      },
+      {
+        region: 'Southeast', state: 'Enugu State', packageName: 'Coal City Escape',
+        tagline: 'Nature, History & Serenity', tier: 'SIGNATURE',
+        durationDays: 3, durationNights: 2, priceSignature: 320000,
+        experienceType: 'Nature & Heritage',
+        attractions: ['Ngwo Pine Forest', 'Awhum Waterfall'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide', 'Transfers'],
+      },
+      {
+        region: 'Southeast', state: 'Imo State', packageName: 'Eastern Heartland Retreat',
+        tagline: 'Relax. Explore. Connect.', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 280000,
+        experienceType: 'Leisure Tourism',
+        attractions: ['Oguta Lake', 'Cultural Villages'],
+        inclusions: ['Hotel Accommodation', 'Transfers'],
+      },
+      {
+        region: 'Southeast', state: 'Abia State', packageName: 'Aba Enterprise Journey',
+        tagline: 'Innovation Meets Culture', tier: 'EXPLORER',
+        durationDays: 2, durationNights: 1, priceExplorer: 250000,
+        experienceType: 'Commerce Tourism',
+        attractions: ['Ariaria Market', 'Cultural Sites'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      {
+        region: 'Southeast', state: 'Ebonyi State', packageName: 'Salt of the Nation Adventure',
+        tagline: 'Discover Hidden Wonders', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 270000,
+        experienceType: 'Nature & Agriculture',
+        attractions: ['Salt Lakes', 'Waterfalls'],
+        inclusions: ['Hotel Accommodation', 'Transfers', 'Tour Guide'],
+      },
+      // ── North-Central ──────────────────────────────────────────────────────────
+      {
+        region: 'North-Central', state: 'FCT Abuja', packageName: 'Capital Explorer',
+        tagline: "Discover Nigeria's Seat of Power", tier: 'SIGNATURE',
+        durationDays: 3, durationNights: 2, priceSignature: 350000,
+        experienceType: 'Urban Tourism',
+        attractions: ['Zuma Rock', 'Millennium Park', 'City Tour'],
+        inclusions: ['Hotel Accommodation', 'Transfers', 'Tour Guide'],
+      },
+      {
+        region: 'North-Central', state: 'Niger State', packageName: 'The Confluence Adventure',
+        tagline: 'Nature Beyond Imagination', tier: 'SIGNATURE',
+        durationDays: 4, durationNights: 3, priceSignature: 400000,
+        experienceType: 'Adventure Tourism',
+        attractions: ['Gurara Falls', 'Kainji Lake'],
+        inclusions: ['Hotel Accommodation', 'Transfers'],
+      },
+      {
+        region: 'North-Central', state: 'Kwara State', packageName: 'Harmony Escape',
+        tagline: 'Where Cultures Meet', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 280000,
+        experienceType: 'Heritage Tourism',
+        attractions: ['Esie Museum', 'Owu Falls'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      {
+        region: 'North-Central', state: 'Kogi State', packageName: 'The Confluence Experience',
+        tagline: 'Where Rivers Meet, Stories Begin', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 300000,
+        experienceType: 'Nature & Heritage',
+        attractions: ['River Niger-Benue Confluence'],
+        inclusions: ['Hotel Accommodation', 'Transfers'],
+      },
+      {
+        region: 'North-Central', state: 'Benue State', packageName: 'Food Basket Discovery',
+        tagline: 'Taste the Heart of Nigeria', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 280000,
+        experienceType: 'Agro Tourism',
+        attractions: ['Makurdi Riverfront', 'Cultural Experiences'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      {
+        region: 'North-Central', state: 'Plateau State', packageName: 'Jos Highland Escape',
+        tagline: 'Cool Weather, Endless Adventure', tier: 'SIGNATURE',
+        durationDays: 4, durationNights: 3, priceSignature: 420000,
+        experienceType: 'Mountain Tourism',
+        attractions: ['Shere Hills', 'Wildlife Park'],
+        inclusions: ['Hotel Accommodation', 'Transfers', 'Tour Guide'],
+      },
+      {
+        region: 'North-Central', state: 'Nasarawa State', packageName: 'Hidden Treasures of Nasarawa',
+        tagline: "Nigeria's Best Kept Secret", tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 270000,
+        experienceType: 'Eco Tourism',
+        attractions: ['Farin Ruwa Falls'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      // ── Northwest ──────────────────────────────────────────────────────────────
+      {
+        region: 'Northwest', state: 'Kano State', packageName: 'Kano Emirate Experience',
+        tagline: 'Journey Through Centuries', tier: 'SIGNATURE',
+        durationDays: 4, durationNights: 3, priceSignature: 450000,
+        experienceType: 'Heritage Tourism',
+        attractions: ['Ancient City Walls', "Emir's Palace"],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      {
+        region: 'Northwest', state: 'Kaduna State', packageName: 'Northern Gateway Escape',
+        tagline: 'Adventure Meets History', tier: 'SIGNATURE',
+        durationDays: 3, durationNights: 2, priceSignature: 350000,
+        experienceType: 'Heritage & Nature',
+        attractions: ['Kajuru Castle', 'Matsirga Falls'],
+        inclusions: ['Hotel Accommodation', 'Transfers'],
+      },
+      {
+        region: 'Northwest', state: 'Katsina State', packageName: 'Land of Legends Trail',
+        tagline: 'Experience Timeless Traditions', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 300000,
+        experienceType: 'Cultural Tourism',
+        attractions: ['Gobarau Minaret'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      {
+        region: 'Northwest', state: 'Jigawa State', packageName: 'Golden Dunes Journey',
+        tagline: 'Beyond the Ordinary', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 280000,
+        experienceType: 'Desert Tourism',
+        attractions: ['Wetlands & Cultural Sites'],
+        inclusions: ['Hotel Accommodation', 'Transfers'],
+      },
+      {
+        region: 'Northwest', state: 'Sokoto State', packageName: 'Caliphate Heritage Tour',
+        tagline: 'Discover the Legacy of Leaders', tier: 'SIGNATURE',
+        durationDays: 4, durationNights: 3, priceSignature: 420000,
+        experienceType: 'Historical Tourism',
+        attractions: ["Sultan's Palace", 'Museum'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      {
+        region: 'Northwest', state: 'Kebbi State', packageName: 'Argungu Adventure',
+        tagline: 'Tradition on the Water', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 300000,
+        experienceType: 'Festival Tourism',
+        attractions: ['Argungu Festival Grounds'],
+        inclusions: ['Hotel Accommodation', 'Transfers'],
+      },
+      {
+        region: 'Northwest', state: 'Zamfara State', packageName: 'Northern Frontier Experience',
+        tagline: 'Discover Untold Stories', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 280000,
+        experienceType: 'Cultural Tourism',
+        attractions: ['Heritage Communities'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      // ── Northeast ──────────────────────────────────────────────────────────────
+      {
+        region: 'Northeast', state: 'Adamawa State', packageName: 'Highlands of Adamawa',
+        tagline: 'Adventure Above the Clouds', tier: 'SIGNATURE',
+        durationDays: 4, durationNights: 3, priceSignature: 450000,
+        experienceType: 'Mountain Tourism',
+        attractions: ['Mambilla Plateau Region'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide', 'Transfers'],
+      },
+      {
+        region: 'Northeast', state: 'Taraba State', packageName: "Nature's Masterpiece Escape",
+        tagline: "Explore Nigeria's Green Frontier", tier: 'SIGNATURE',
+        durationDays: 4, durationNights: 3, priceSignature: 480000,
+        experienceType: 'Eco Tourism',
+        attractions: ['Gashaka Gumti National Park'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      {
+        region: 'Northeast', state: 'Borno State', packageName: 'Lake Chad Heritage Journey',
+        tagline: 'Discover Ancient Trade Routes', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 320000,
+        experienceType: 'Historical Tourism',
+        attractions: ['Cultural Heritage Experiences'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+      {
+        region: 'Northeast', state: 'Yobe State', packageName: 'Desert Discovery Trail',
+        tagline: 'Experience Northern Horizons', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 300000,
+        experienceType: 'Desert Tourism',
+        attractions: ['Dune Landscapes'],
+        inclusions: ['Hotel Accommodation', 'Transfers'],
+      },
+      {
+        region: 'Northeast', state: 'Bauchi State', packageName: 'Yankari Wildlife Safari',
+        tagline: "Africa's Wild Side Awaits", tier: 'EXECUTIVE',
+        durationDays: 5, durationNights: 4, priceExecutive: 650000,
+        experienceType: 'Safari Tourism',
+        attractions: ['Yankari Game Reserve'],
+        inclusions: ['Resort Accommodation', 'Safari Guide', 'Transfers'],
+      },
+      {
+        region: 'Northeast', state: 'Gombe State', packageName: 'Jewel of the Savannah',
+        tagline: 'Discover Untamed Beauty', tier: 'EXPLORER',
+        durationDays: 3, durationNights: 2, priceExplorer: 290000,
+        experienceType: 'Eco Tourism',
+        attractions: ['Savannah Landscapes'],
+        inclusions: ['Hotel Accommodation', 'Tour Guide'],
+      },
+    ];
+
+    for (const h of HOLIDAYS) {
+      await db.holiday.upsert({
+        where: { state_packageName: { state: h.state, packageName: h.packageName } },
+        create: h,
+        update: {
+          tagline: h.tagline,
+          tier: h.tier,
+          durationDays: h.durationDays,
+          durationNights: h.durationNights,
+          priceExplorer: h.priceExplorer ?? null,
+          priceSignature: h.priceSignature ?? null,
+          priceExecutive: h.priceExecutive ?? null,
+          experienceType: h.experienceType,
+          attractions: h.attractions,
+          inclusions: h.inclusions,
+        },
+      });
+    }
+
+    console.log('Holiday & club seed complete.');
+
     await db.$disconnect();
     console.log('Database seeded.');
   } catch (err) {
