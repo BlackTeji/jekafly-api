@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { auth } = require('../middleware/auth');
+const { authenticate } = require('../middleware/auth');
 const {
     listHolidays,
     getHoliday,
@@ -10,9 +10,9 @@ const {
 } = require('../controllers/holidays');
 
 router.get('/', listHolidays);
-router.get('/my-bookings', auth, myBookings);
+router.get('/my-bookings', authenticate, myBookings);
 router.get('/:id', getHoliday);
 router.get('/:id/availability', getAvailability);
-router.post('/book', auth, createBooking);
+router.post('/book', authenticate, createBooking);
 
 module.exports = router;
