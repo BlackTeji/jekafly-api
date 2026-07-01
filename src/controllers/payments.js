@@ -196,7 +196,10 @@ async function handleHolidayPaymentSuccess(payment, reference) {
   const meta = payment.metadata || {};
   if (!meta.bookingRef) return;
 
-  const booking = await prisma.holidayBooking.findUnique({ where: { ref: meta.bookingRef } });
+  const booking = await prisma.holidayBooking.findUnique({
+    where: { ref: meta.bookingRef },
+    include: { holiday: true, holidayDate: true },
+  });
   if (!booking || booking.status === 'CONFIRMED') return;
 
   await prisma.holidayBooking.update({

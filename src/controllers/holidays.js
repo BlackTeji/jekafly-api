@@ -242,4 +242,77 @@ async function myBookings(req, res) {
     }
 }
 
-module.exports = { listHolidays, getHoliday, getAvailability, createBooking, myBookings };
+async function adminListPackages(req, res) {
+    try {
+        const holidays = await db.holiday.findMany({
+            include: { dates: { orderBy: { date: 'asc' } } },
+            orderBy: [{ region: 'asc' }, { packageName: 'asc' }],
+        });
+        return res.json({ ok: true, data: { holidays } });
+    } catch (err) {
+        console.error('adminListPackages error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to load packages' });
+    }
+}
+
+async function adminCreateDate(req, res) {
+    try {
+        const { date, capacity } = req.body;
+        if (!date) return res.status(400).json({ ok: false, error: 'Date is required' });
+
+        const holiday = await db.holiday.findUnique({ where: { id: req.params.holidayId } });
+        if (!holiday) return res.status(404).json({ ok: false, error: 'Package not found' });
+
+        const created = await db.holidayDate.create({
+            data: {
+                holidayId: req.params.holidayId,
+                date: new Date(date),
+                capacity: capacity != null ? parseInt(capacity) : 20,
+            },
+        });
+        return res.status(201).json({ ok: true, data: { date: created } });
+    } catch (err) {
+        console.error('adminCreateDate error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to create date' });
+    }
+}
+
+async function adminUpdateDate(req, res) {
+    try {
+        const { date, capacity } = req.body;
+        const updated = await db.holidayDate.update({
+            where: { id: req.params.dateId },
+            data: {
+                ...(date && { date: new Date(date) }),
+                ...(capacity != null && { capacity: parseInt(capacity) }),
+            },
+        });
+        return res.json({ ok: true, data: { date: updated } });
+    } catch (err) {
+        console.error('adminUpdateDate error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to update date' });
+    }
+}
+
+async function adminDeleteDate(req, res) {
+    try {
+        const existing = await db.holidayDate.findUnique({
+            where: { id: req.params.dateId },
+            include: { bookings: true },
+        });
+        if (!existing) return res.status(404).json({ ok: false, error: 'Date not found' });
+        if (existing.bookings.length > 0) {
+            return res.status(400).json({ ok: false, error: 'Cannot delete a date with existing bookings' });
+        }
+        await db.holidayDate.delete({ where: { id: req.params.dateId } });
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('adminDeleteDate error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to delete date' });
+    }
+}
+
+module.exports = {
+  listHolidays, getHoliday, getAvailability, createBooking, myBookings,
+  adminListPackages, adminCreateDate, adminUpdateDate, adminDeleteDate,
+};
