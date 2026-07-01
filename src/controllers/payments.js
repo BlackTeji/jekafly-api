@@ -11,7 +11,7 @@ const config = require('../config');
 exports.initiate = async (req, res, next) => {
   try {
     const schema = z.object({
-      type: z.enum(['VISA', 'INSURANCE', 'CONSULTATION', 'FLIGHT', 'HOTEL']),
+      type: z.enum(['VISA', 'INSURANCE', 'CONSULTATION', 'FLIGHT', 'HOTEL', 'HOLIDAY', 'CLUB_MEMBERSHIP']),
       ref: z.string().optional(),
       amount: z.number().min(1),
       email: z.string().email(),
@@ -184,6 +184,65 @@ async function handleChargeSuccess(data) {
     });
     if (user) await emails.consultationBooked(user).catch(() => { });
   }
+
+  if (payment.type === 'HOLIDAY') {
+    await handleHolidayPaymentSuccess(payment, reference).catch((err) => {
+      console.error('[Holiday Payment Error]', err.message);
+    });
+  }
+}
+
+async function handleHolidayPaymentSuccess(payment, reference) {
+  const meta = payment.metadata || {};
+  if (!meta.bookingRef) return;
+
+  const booking = await prisma.holidayBooking.findUnique({ where: { ref: meta.bookingRef } });
+  if (!booking || booking.status === 'CONFIRMED') return;
+
+  await prisma.holidayBooking.update({
+    where: { ref: meta.bookingRef },
+    data: { status: 'CONFIRMED', paymentRef: reference },
+  });
+
+  if (meta.membershipAdded) {
+    const now = new Date();
+    const expiry = new Date(now);
+    expiry.setFullYear(expiry.getFullYear() + 1);
+    const amountPaid = Math.round(Number(meta.membershipAmount) || 0);
+
+    const existing = await prisma.clubMembership.findUnique({ where: { userId: payment.userId } });
+    if (existing) {
+      await prisma.clubMembership.update({
+        where: { userId: payment.userId },
+        data: {
+          status: 'ACTIVE',
+          startDate: now,
+          expiryDate: expiry,
+          amountPaid: amountPaid || existing.amountPaid,
+          paymentRef: reference,
+        },
+      });
+    } else {
+      await prisma.clubMembership.create({
+        data: {
+          userId: payment.userId,
+          status: 'ACTIVE',
+          startDate: now,
+          expiryDate: expiry,
+          amountPaid,
+          paymentRef: reference,
+        },
+      });
+    }
+  }
+
+  const user = await prisma.user.findUnique({
+    where: { id: payment.userId },
+    select: { name: true, email: true },
+  });
+  if (user && typeof emails.holidayBooked === 'function') {
+    await emails.holidayBooked(booking, user).catch(() => { });
+  }
 }
 
 async function creditAffiliateCommission(app, amountKobo) {
@@ -243,6 +302,12 @@ exports.verify = async (req, res, next) => {
               },
             },
           },
+        });
+      }
+
+      if (payment.type === 'HOLIDAY') {
+        await handleHolidayPaymentSuccess(payment, reference).catch((err) => {
+          console.error('[Holiday Payment Error]', err.message);
         });
       }
     }
