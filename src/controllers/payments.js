@@ -204,7 +204,7 @@ async function handleHolidayPaymentSuccess(payment, reference) {
 
   await prisma.holidayBooking.update({
     where: { ref: meta.bookingRef },
-    data: { status: 'CONFIRMED', paymentRef: reference },
+    data: { status: 'CONFIRMED', paymentRef: reference, paidAt: new Date() },
   });
 
   if (meta.membershipAdded) {
