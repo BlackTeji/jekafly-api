@@ -251,14 +251,20 @@ async function start() {
     }
 
     const adminHash = await bcrypt.hash(process.env.ADMIN_PASSWORD || 'admin1234', 12);
-    await db.user.upsert({
-      where: { email: 'admin@jekafly.com' },
-      create: {
-        id: 'ADMIN001', name: 'Jekafly Admin', email: 'admin@jekafly.com',
-        phone: '+234 800 000 0001', passwordHash: adminHash, role: 'ADMIN', adminRole: 'super',
-      },
-      update: { passwordHash: adminHash, role: 'ADMIN', adminRole: 'super' },
-    });
+    const existingAdmin = await db.user.findUnique({ where: { id: 'ADMIN001' } });
+    if (existingAdmin) {
+      await db.user.update({
+        where: { id: 'ADMIN001' },
+        data: { role: 'ADMIN', adminRole: 'super' },
+      });
+    } else {
+      await db.user.create({
+        data: {
+          id: 'ADMIN001', name: 'Jekafly Admin', email: 'admin@jekafly.com',
+          phone: '+234 800 000 0001', passwordHash: adminHash, role: 'ADMIN', adminRole: 'super',
+        },
+      });
+    }
 
     await db.serviceFee.upsert({
       where: { id: 'singleton' }, create: { id: 'singleton', amount: 25000 }, update: {},
