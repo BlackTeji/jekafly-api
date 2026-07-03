@@ -315,7 +315,102 @@ async function adminDeleteDate(req, res) {
     }
 }
 
+async function adminListBookings(req, res) {
+    try {
+        const { status, holidayId, search } = req.query;
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const pageSize = Math.min(200, Math.max(1, parseInt(req.query.pageSize) || 20));
+
+        const where = {};
+        if (status && status !== 'all') where.status = status.toUpperCase();
+        if (holidayId) where.holidayId = holidayId;
+        if (search) {
+            where.OR = [
+                { ref: { contains: search, mode: 'insensitive' } },
+                { leadName: { contains: search, mode: 'insensitive' } },
+                { leadEmail: { contains: search, mode: 'insensitive' } },
+                { leadPhone: { contains: search, mode: 'insensitive' } },
+            ];
+        }
+
+        const [total, bookings] = await Promise.all([
+            db.holidayBooking.count({ where }),
+            db.holidayBooking.findMany({
+                where,
+                include: {
+                    holiday: { select: { packageName: true, state: true, region: true } },
+                    holidayDate: { select: { date: true, endDate: true } },
+                    user: { select: { id: true, name: true, email: true, phone: true } },
+                },
+                orderBy: { createdAt: 'desc' },
+                skip: (page - 1) * pageSize,
+                take: pageSize,
+            }),
+        ]);
+
+        return res.json({
+            ok: true,
+            data: { bookings, total, page, pageSize, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
+        });
+    } catch (err) {
+        console.error('adminListBookings error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to load bookings' });
+    }
+}
+
+async function adminUpdateBookingStatus(req, res) {
+    try {
+        const { status } = req.body;
+        const validStatuses = ['PENDING', 'CONFIRMED', 'CANCELLED'];
+        if (!status || !validStatuses.includes(status.toUpperCase())) {
+            return res.status(400).json({ ok: false, error: 'Invalid status' });
+        }
+        const newStatus = status.toUpperCase();
+
+        const booking = await db.holidayBooking.findUnique({ where: { id: req.params.id } });
+        if (!booking) return res.status(404).json({ ok: false, error: 'Booking not found' });
+        if (booking.status === newStatus) {
+            return res.json({ ok: true, data: { booking } });
+        }
+
+        const result = await db.$transaction(async (tx) => {
+            // Cancelling a previously-confirmed booking releases its claimed capacity.
+            if (booking.status === 'CONFIRMED' && newStatus === 'CANCELLED') {
+                await tx.holidayDate.update({
+                    where: { id: booking.holidayDateId },
+                    data: { bookedCount: { decrement: booking.travellers } },
+                });
+            }
+            // Reconfirming re-claims capacity — but only if there's still room.
+            if (booking.status !== 'CONFIRMED' && newStatus === 'CONFIRMED') {
+                const slot = await tx.holidayDate.findUnique({ where: { id: booking.holidayDateId } });
+                if (!slot || slot.bookedCount + booking.travellers > slot.capacity) {
+                    throw new Error('CAPACITY_UNAVAILABLE');
+                }
+                await tx.holidayDate.update({
+                    where: { id: booking.holidayDateId },
+                    data: { bookedCount: { increment: booking.travellers } },
+                });
+            }
+
+            return tx.holidayBooking.update({
+                where: { id: booking.id },
+                data: { status: newStatus },
+            });
+        });
+
+        return res.json({ ok: true, data: { booking: result } });
+    } catch (err) {
+        if (err.message === 'CAPACITY_UNAVAILABLE') {
+            return res.status(400).json({ ok: false, error: 'Not enough capacity left on this date to reconfirm this booking' });
+        }
+        console.error('adminUpdateBookingStatus error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to update booking' });
+    }
+}
+
 module.exports = {
   listHolidays, getHoliday, getAvailability, createBooking, myBookings,
   adminListPackages, adminCreateDate, adminUpdateDate, adminDeleteDate,
+  adminListBookings, adminUpdateBookingStatus,
 };

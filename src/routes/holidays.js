@@ -11,6 +11,8 @@ const {
     adminCreateDate,
     adminUpdateDate,
     adminDeleteDate,
+    adminListBookings,
+    adminUpdateBookingStatus,
 } = require('../controllers/holidays');
 
 router.get('/', listHolidays);
@@ -19,6 +21,8 @@ router.get('/admin/packages', authenticate, requireAdmin, adminListPackages);
 router.post('/admin/:holidayId/dates', authenticate, requireAdmin, adminCreateDate);
 router.patch('/admin/dates/:dateId', authenticate, requireAdmin, adminUpdateDate);
 router.delete('/admin/dates/:dateId', authenticate, requireAdmin, adminDeleteDate);
+router.get('/admin/bookings', authenticate, requireAdmin, adminListBookings);
+router.patch('/admin/bookings/:id', authenticate, requireAdmin, adminUpdateBookingStatus);
 router.get('/:id', getHoliday);
 router.get('/:id/availability', getAvailability);
 router.post('/book', authenticate, createBooking);
