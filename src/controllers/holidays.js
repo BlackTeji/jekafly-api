@@ -23,14 +23,22 @@ async function listHolidays(req, res) {
                 dates: {
                     where: { date: { gte: new Date() } },
                     orderBy: { date: 'asc' },
-                    take: 3,
                 },
             },
             orderBy: [{ region: 'asc' }, { packageName: 'asc' }],
         });
 
+        const withAvailability = holidays.map(h => {
+            const openDates = h.dates.filter(d => d.bookedCount < d.capacity);
+            return {
+                ...h,
+                hasAvailability: openDates.length > 0,
+                dates: openDates.slice(0, 3),
+            };
+        });
+
         const grouped = {};
-        for (const h of holidays) {
+        for (const h of withAvailability) {
             if (!grouped[h.region]) grouped[h.region] = [];
             grouped[h.region].push(h);
         }
@@ -51,15 +59,6 @@ async function getHoliday(req, res) {
     try {
         const holiday = await db.holiday.findUnique({
             where: { id: req.params.id },
-            include: {
-                dates: {
-                    where: {
-                        date: { gte: new Date() },
-                        bookedCount: { lt: db.holidayDate.fields.capacity },
-                    },
-                    orderBy: { date: 'asc' },
-                },
-            },
         });
 
         if (!holiday) return res.status(404).json({ ok: false, error: 'Package not found' });
@@ -78,7 +77,9 @@ async function getHoliday(req, res) {
             isFull: d.bookedCount >= d.capacity,
         }));
 
-        return res.json({ ok: true, data: { holiday: { ...holiday, availableDates } } });
+        const hasAvailability = availableDates.some(d => !d.isFull);
+
+        return res.json({ ok: true, data: { holiday: { ...holiday, availableDates, hasAvailability } } });
     } catch (err) {
         console.error('getHoliday error:', err);
         return res.status(500).json({ ok: false, error: 'Failed to load package' });
@@ -257,7 +258,7 @@ async function adminListPackages(req, res) {
 
 async function adminCreateDate(req, res) {
     try {
-        const { date, capacity } = req.body;
+        const { date, endDate, capacity } = req.body;
         if (!date) return res.status(400).json({ ok: false, error: 'Date is required' });
 
         const holiday = await db.holiday.findUnique({ where: { id: req.params.holidayId } });
@@ -267,6 +268,7 @@ async function adminCreateDate(req, res) {
             data: {
                 holidayId: req.params.holidayId,
                 date: new Date(date),
+                endDate: endDate ? new Date(endDate) : null,
                 capacity: capacity != null ? parseInt(capacity) : 20,
             },
         });
@@ -279,11 +281,12 @@ async function adminCreateDate(req, res) {
 
 async function adminUpdateDate(req, res) {
     try {
-        const { date, capacity } = req.body;
+        const { date, endDate, capacity } = req.body;
         const updated = await db.holidayDate.update({
             where: { id: req.params.dateId },
             data: {
                 ...(date && { date: new Date(date) }),
+                ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
                 ...(capacity != null && { capacity: parseInt(capacity) }),
             },
         });

@@ -429,13 +429,14 @@ enum HolidayStatus {
 }
 
 model HolidayDate {
-  id          String   @id @default(uuid())
+  id          String    @id @default(uuid())
   holidayId   String
-  holiday     Holiday  @relation(fields: [holidayId], references: [id], onDelete: Cascade)
+  holiday     Holiday   @relation(fields: [holidayId], references: [id], onDelete: Cascade)
   date        DateTime
-  capacity    Int      @default(20)
-  bookedCount Int      @default(0)
-  createdAt   DateTime @default(now())
+  endDate     DateTime?
+  capacity    Int       @default(20)
+  bookedCount Int       @default(0)
+  createdAt   DateTime  @default(now())
 
   bookings HolidayBooking[]
 

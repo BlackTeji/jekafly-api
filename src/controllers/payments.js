@@ -202,6 +202,19 @@ async function handleHolidayPaymentSuccess(payment, reference) {
   });
   if (!booking || booking.status === 'CONFIRMED') return;
 
+  const slot = booking.holidayDate;
+  const claimed = await prisma.holidayDate.updateMany({
+    where: {
+      id: slot.id,
+      bookedCount: { lte: slot.capacity - booking.travellers },
+    },
+    data: { bookedCount: { increment: booking.travellers } },
+  });
+
+  if (claimed.count === 0) {
+    console.error(`[Holiday] Capacity race on confirm — booking ${booking.ref} paid but slot ${slot.id} was already full. Needs manual review.`);
+  }
+
   await prisma.holidayBooking.update({
     where: { ref: meta.bookingRef },
     data: { status: 'CONFIRMED', paymentRef: reference, paidAt: new Date() },
