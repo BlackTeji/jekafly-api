@@ -455,11 +455,12 @@ model HolidayBooking {
   holidayDateId   String
   holidayDate     HolidayDate          @relation(fields: [holidayDateId], references: [id])
 
-  tier            HolidayTier
-  travellers      Int
-  leadName        String
-  leadEmail       String
-  leadPhone       String?
+  tier                 HolidayTier
+  travellers           Int
+  leadName             String
+  leadEmail            String
+  leadPhone            String?
+  additionalTravellers Json?
 
   tierAmount      Int
   membershipAdded Boolean              @default(false)

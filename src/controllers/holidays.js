@@ -123,12 +123,25 @@ async function createBooking(req, res) {
             leadEmail,
             leadPhone,
             addMembership,
+            additionalTravellers,
         } = req.body;
 
         const userId = req.user.id;
 
         if (!holidayId || !holidayDateId || !tier || !travellers || !leadName || !leadEmail) {
             return res.status(400).json({ ok: false, error: 'Missing required fields' });
+        }
+
+        const rawAdditional = Array.isArray(additionalTravellers) ? additionalTravellers : [];
+        const sanitizedTravellers = rawAdditional
+            .map(t => ({
+                name: String(t?.name || '').trim().slice(0, 120),
+                phone: String(t?.phone || '').trim().slice(0, 30) || null,
+            }))
+            .filter(t => t.name);
+
+        if (sanitizedTravellers.length !== travellers - 1) {
+            return res.status(400).json({ ok: false, error: 'Please provide a full name for every additional traveller' });
         }
 
         const validTiers = ['EXPLORER', 'SIGNATURE', 'EXECUTIVE'];
@@ -186,6 +199,7 @@ async function createBooking(req, res) {
                 leadName,
                 leadEmail,
                 leadPhone,
+                additionalTravellers: sanitizedTravellers,
                 tierAmount,
                 membershipAdded,
                 membershipAmount,
