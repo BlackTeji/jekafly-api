@@ -245,33 +245,42 @@ const emails = {
     ),
   }),
 
-  holidayBooked: async (booking, user) => sendEmail({
-    to: booking.leadEmail || user.email,
-    subject: `Booking Confirmed — ${booking.holiday?.packageName || 'Your Holiday'} (${booking.ref})`,
-    html: layout(`
-      ${badge('Booking Confirmed')}
-      <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">Your holiday is booked, ${(booking.leadName || user.name).split(' ')[0]}.</h1>
-      <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Your payment has been confirmed and your <strong style="color:${NAVY};">${booking.holiday?.packageName || 'holiday package'}</strong> booking is locked in. Here's your itinerary summary.</p>
-      ${infoTable(`
-        ${infoRow('Booking Ref', `<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">${booking.ref}</span>`)}
-        ${infoRow('Package', booking.holiday?.packageName || '—')}
-        ${infoRow('Destination', booking.holiday?.state || '—')}
-        ${infoRow('Tier', booking.tier)}
-        ${infoRow('Travel Date', booking.holidayDate?.date ? new Date(booking.holidayDate.date).toDateString() : '—')}
-        ${infoRow('Travellers', booking.travellers)}
-        ${infoRow('Tier Cost', `₦${(booking.tierAmount || 0).toLocaleString()}`)}
-        ${booking.membershipAdded ? infoRow('Travel Club Membership', `₦${(booking.membershipAmount || 0).toLocaleString()}`) : ''}
-        ${infoRow('Total Paid', `<strong style="color:#16a34a;">₦${(booking.totalAmount || 0).toLocaleString()}</strong>`)}
-      `)}
-      ${booking.membershipAdded
-        ? alertBox('🎉', '<strong>Travel Club activated!</strong> Your annual membership is now active — enjoy early access to deals, priority visa assistance, airport lounge access, and more.')
-        : ''
-      }
-      <div style="text-align:center;margin:32px 0 8px;">
-        ${btn('View My Bookings →', `${config.frontendUrl}/dashboard`)}
-      </div>
-    `),
-  }),
+  holidayBooked: async (booking, user) => {
+    const additionalTravellers = Array.isArray(booking.additionalTravellers) ? booking.additionalTravellers : [];
+    const travellerRows = additionalTravellers
+      .map((t, i) => infoRow(`Traveller ${i + 2}`, t?.name ? String(t.name) : '—'))
+      .join('');
+
+    return sendEmail({
+      to: booking.leadEmail || user.email,
+      subject: `Booking Confirmed — ${booking.holiday?.packageName || 'Your Holiday'} (${booking.ref})`,
+      html: layout(`
+        ${badge('Booking Confirmed')}
+        <h1 style="margin:0 0 10px;font-size:26px;font-weight:800;color:${NAVY};letter-spacing:-0.03em;line-height:1.2;">Your holiday is booked, ${(booking.leadName || user.name).split(' ')[0]}.</h1>
+        <p style="margin:0 0 24px;font-size:15px;color:#4B5563;line-height:1.7;">Your payment has been confirmed and your <strong style="color:${NAVY};">${booking.holiday?.packageName || 'holiday package'}</strong> booking is locked in. Here's your itinerary summary.</p>
+        ${infoTable(`
+          ${infoRow('Booking Ref', `<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">${booking.ref}</span>`)}
+          ${infoRow('Package', booking.holiday?.packageName || '—')}
+          ${infoRow('Destination', booking.holiday?.state || '—')}
+          ${infoRow('Tier', booking.tier)}
+          ${infoRow('Travel Date', booking.holidayDate?.date ? new Date(booking.holidayDate.date).toDateString() : '—')}
+          ${infoRow('Travellers', booking.travellers)}
+          ${infoRow('Lead Traveller', booking.leadName || '—')}
+          ${travellerRows}
+          ${infoRow('Tier Cost', `₦${(booking.tierAmount || 0).toLocaleString()}`)}
+          ${booking.membershipAdded ? infoRow('Travel Club Membership', `₦${(booking.membershipAmount || 0).toLocaleString()}`) : ''}
+          ${infoRow('Total Paid', `<strong style="color:#16a34a;">₦${(booking.totalAmount || 0).toLocaleString()}</strong>`)}
+        `)}
+        ${booking.membershipAdded
+          ? alertBox('🎉', '<strong>Travel Club activated!</strong> Your annual membership is now active — enjoy early access to deals, priority visa assistance, airport lounge access, and more.')
+          : ''
+        }
+        <div style="text-align:center;margin:32px 0 8px;">
+          ${btn('View My Bookings →', `${config.frontendUrl}/dashboard`)}
+        </div>
+      `),
+    });
+  },
 
   insurancePolicy: async (policy, user) => sendEmail({
     to: user.email,

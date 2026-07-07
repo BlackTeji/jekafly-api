@@ -423,8 +423,46 @@ async function adminUpdateBookingStatus(req, res) {
     }
 }
 
+async function adminUpdateHoliday(req, res) {
+    try {
+        const { priceExplorer, priceSignature, priceExecutive, status } = req.body;
+
+        const holiday = await db.holiday.findUnique({ where: { id: req.params.id } });
+        if (!holiday) return res.status(404).json({ ok: false, error: 'Package not found' });
+
+        const data = {};
+        for (const [key, val] of [['priceExplorer', priceExplorer], ['priceSignature', priceSignature], ['priceExecutive', priceExecutive]]) {
+            if (val === undefined) continue;
+            if (val === null || val === '') { data[key] = null; continue; }
+            const n = parseInt(val, 10);
+            if (isNaN(n) || n < 0) {
+                return res.status(400).json({ ok: false, error: `Invalid value for ${key}` });
+            }
+            data[key] = n;
+        }
+
+        if (status !== undefined) {
+            const validStatuses = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
+            if (!validStatuses.includes(status.toUpperCase())) {
+                return res.status(400).json({ ok: false, error: 'Invalid status' });
+            }
+            data.status = status.toUpperCase();
+        }
+
+        const updated = await db.holiday.update({
+            where: { id: req.params.id },
+            data,
+        });
+
+        return res.json({ ok: true, data: { holiday: updated } });
+    } catch (err) {
+        console.error('adminUpdateHoliday error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to update package' });
+    }
+}
+
 module.exports = {
-  listHolidays, getHoliday, getAvailability, createBooking, myBookings,
-  adminListPackages, adminCreateDate, adminUpdateDate, adminDeleteDate,
-  adminListBookings, adminUpdateBookingStatus,
+    listHolidays, getHoliday, getAvailability, createBooking, myBookings,
+    adminListPackages, adminCreateDate, adminUpdateDate, adminDeleteDate,
+    adminListBookings, adminUpdateBookingStatus, adminUpdateHoliday,
 };
