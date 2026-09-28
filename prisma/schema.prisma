@@ -392,16 +392,22 @@ model Holiday {
   state            String
   packageName      String
   tagline          String
-  tier             HolidayTier
+  category         HolidayCategory @default(LOCAL)
+  tier             HolidayTier?
   durationDays     Int
   durationNights   Int
+  price            Int?
+  priceSingle      Int?
+  priceSharing     Int?
   priceExplorer    Int?
   priceSignature   Int?
   priceExecutive   Int?
   experienceType   String
   attractions      Json
   inclusions       Json
+  notes            String?
   images           Json          @default("[]")
+  sortOrder        Int           @default(0)
   status           HolidayStatus @default(ACTIVE)
   createdAt        DateTime      @default(now())
   updatedAt        DateTime      @updatedAt
@@ -413,7 +419,13 @@ model Holiday {
   @@index([region])
   @@index([tier])
   @@index([status])
+  @@index([category])
   @@map("holidays")
+}
+
+enum HolidayCategory {
+  LOCAL
+  INTERNATIONAL
 }
 
 enum HolidayTier {
@@ -455,7 +467,9 @@ model HolidayBooking {
   holidayDateId   String
   holidayDate     HolidayDate          @relation(fields: [holidayDateId], references: [id])
 
-  tier                 HolidayTier
+  tier                 HolidayTier?
+  occupancy            HolidayOccupancy?
+  unitPrice            Int?
   travellers           Int
   leadName             String
   leadEmail            String
@@ -479,6 +493,11 @@ model HolidayBooking {
   @@index([status])
   @@index([createdAt])
   @@map("holiday_bookings")
+}
+
+enum HolidayOccupancy {
+  SINGLE
+  SHARING
 }
 
 enum HolidayBookingStatus {

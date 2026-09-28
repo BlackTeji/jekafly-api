@@ -1,0 +1,1110 @@
+[
+  {
+    "category": "LOCAL",
+    "region": "Southwest",
+    "state": "Lagos State",
+    "packageName": "The Eko Experience",
+    "tagline": "Where Energy Meets Luxury",
+    "durationDays": 2,
+    "durationNights": 1,
+    "price": 500000,
+    "experienceType": "Urban Lifestyle, Entertainment, Beaches, Nightlife",
+    "attractions": [
+      "Boat Cruise Experience",
+      "Beach Day Out",
+      "Art Gallery Visit",
+      "Blue Line Rail Experience",
+      "Nightlife Experience in Lekki & Victoria Island",
+      "Restaurant Fine Dining"
+    ],
+    "inclusions": [
+      "Daily Breakfast",
+      "Hotel Accommodation",
+      "Intercity Transfer & Local Movement",
+      "Curated Destination Guide",
+      "Access to Listed Attractions",
+      "Branded Travel Pack"
+    ],
+    "sortOrder": 10,
+    "images": [
+      "assets/images/lagos.jpg"
+    ]
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southwest",
+    "state": "Ogun State",
+    "packageName": "Gateway Trails",
+    "tagline": "Discover Heritage Beyond the Horizon",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 300000,
+    "experienceType": "Heritage, Culture, Nature, Adventure",
+    "attractions": [
+      "Rock Climbing Adventure",
+      "Adire Market Experience",
+      "OOPL Wildlife Park",
+      "Cultural City Tours"
+    ],
+    "inclusions": [
+      "Daily Breakfast",
+      "Hotel Accommodation",
+      "Intercity Transfer & Local Movement",
+      "Curated Destination Guide",
+      "Access to Listed Attractions",
+      "Branded Travel Pack"
+    ],
+    "sortOrder": 20,
+    "images": [
+      "assets/images/ogun.jpg"
+    ]
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southwest",
+    "state": "Oyo State",
+    "packageName": "The Alaafin Legacy",
+    "tagline": "Walk Through the Kingdom of Legends",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 350000,
+    "experienceType": "Royal Heritage, History, Food & Culture",
+    "attractions": [
+      "Ibadan City Tour",
+      "Agodi Gardens",
+      "Heritage Sites",
+      "Local Cuisine Experience"
+    ],
+    "inclusions": [
+      "Daily Breakfast",
+      "Hotel Accommodation",
+      "Intercity Transfer & Local Movement",
+      "Curated Destination Guide",
+      "Access to Listed Attractions",
+      "Branded Travel Pack"
+    ],
+    "sortOrder": 30,
+    "images": [
+      "assets/images/oyo.jpg"
+    ]
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southwest",
+    "state": "Ondo State",
+    "packageName": "Sunrise Coast Escape",
+    "tagline": "Where Nature Meets Serenity",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 400000,
+    "experienceType": "Nature, Adventure, Wellness",
+    "attractions": [
+      "Idanre Hills",
+      "Coastal Exploration",
+      "Eco-Tourism Trails",
+      "Nature Retreat"
+    ],
+    "inclusions": [
+      "Daily Breakfast",
+      "Hotel Accommodation",
+      "Intercity Transfer & Local Movement",
+      "Curated Destination Guide",
+      "Access to Listed Attractions",
+      "Branded Travel Pack"
+    ],
+    "sortOrder": 40,
+    "images": [
+      "assets/images/ondo.jpg"
+    ]
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southwest",
+    "state": "Osun State",
+    "packageName": "Sacred Osun Journey",
+    "tagline": "Experience the Spirit of Heritage",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 350000,
+    "experienceType": "Spiritual Tourism, Heritage, Culture",
+    "attractions": [
+      "Osun Sacred Grove",
+      "Ile-Ife Heritage Tour",
+      "Cultural Village Experience"
+    ],
+    "inclusions": [
+      "Daily Breakfast",
+      "Hotel Accommodation",
+      "Intercity Transfer & Local Movement",
+      "Curated Destination Guide",
+      "Access to Listed Attractions",
+      "Branded Travel Pack"
+    ],
+    "sortOrder": 50,
+    "images": [
+      "assets/images/osun.jpg"
+    ]
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southwest",
+    "state": "Ekiti State",
+    "packageName": "The Hidden Gem Escape",
+    "tagline": "Discover Nigeria's Best-Kept Secret",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 400000,
+    "experienceType": "Eco-Tourism, Wellness, Adventure",
+    "attractions": [
+      "Ikogosi Warm Springs",
+      "Arinta Waterfalls",
+      "Hiking & Nature Exploration"
+    ],
+    "inclusions": [
+      "Daily Breakfast",
+      "Hotel Accommodation",
+      "Intercity Transfer & Local Movement",
+      "Curated Destination Guide",
+      "Access to Listed Attractions",
+      "Branded Travel Pack"
+    ],
+    "sortOrder": 60,
+    "images": [
+      "assets/images/ekiti.jpg"
+    ]
+  },
+  {
+    "category": "LOCAL",
+    "region": "South-South",
+    "state": "Akwa Ibom State",
+    "packageName": "The Ibom Escape",
+    "tagline": "Where Hospitality Meets Paradise",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 400000,
+    "experienceType": "Coastal Luxury",
+    "attractions": [
+      "Ibeno Beach",
+      "Ibom Plaza",
+      "Raffia City Tour"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Local Transfers",
+      "Tour Guide",
+      "Access to Listed Attractions"
+    ],
+    "sortOrder": 10
+  },
+  {
+    "category": "LOCAL",
+    "region": "South-South",
+    "state": "Cross River State",
+    "packageName": "The Calabar Discovery",
+    "tagline": "Experience Nigeria's Tourism Capital",
+    "durationDays": 4,
+    "durationNights": 3,
+    "price": 500000,
+    "experienceType": "Culture & Nature",
+    "attractions": [
+      "Obudu Mountain Resort",
+      "Tinapa",
+      "Marina Resort"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Local Transfers",
+      "Tour Guide",
+      "Access to Listed Attractions"
+    ],
+    "sortOrder": 20
+  },
+  {
+    "category": "LOCAL",
+    "region": "South-South",
+    "state": "Rivers State",
+    "packageName": "Garden City Prestige",
+    "tagline": "Business Meets Lifestyle",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Urban Lifestyle",
+    "attractions": [
+      "Port Harcourt City Tour",
+      "Pleasure Park",
+      "Nightlife"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Local Transfers",
+      "Tour Guide"
+    ],
+    "sortOrder": 30
+  },
+  {
+    "category": "LOCAL",
+    "region": "South-South",
+    "state": "Bayelsa State",
+    "packageName": "Creeks & Culture Experience",
+    "tagline": "Discover the Heart of the Delta",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 400000,
+    "experienceType": "Eco & Cultural Tourism",
+    "attractions": [
+      "Oxbow Lake",
+      "Creek Excursions"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Boat Transfers",
+      "Tour Guide"
+    ],
+    "sortOrder": 40
+  },
+  {
+    "category": "LOCAL",
+    "region": "South-South",
+    "state": "Delta State",
+    "packageName": "Delta Heritage Trail",
+    "tagline": "Where Tradition Meets Modernity",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 400000,
+    "experienceType": "Heritage & Lifestyle",
+    "attractions": [
+      "Nana Living History Museum",
+      "Asaba City Tour"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers",
+      "Tour Guide"
+    ],
+    "sortOrder": 50
+  },
+  {
+    "category": "LOCAL",
+    "region": "South-South",
+    "state": "Edo State",
+    "packageName": "Benin Kingdom Legacy",
+    "tagline": "Walk Through a Timeless Empire",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 400000,
+    "experienceType": "Royal Heritage",
+    "attractions": [
+      "Benin Moat",
+      "National Museum",
+      "Palace District"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Local Transfers",
+      "Tour Guide"
+    ],
+    "sortOrder": 60
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southeast",
+    "state": "Anambra State",
+    "packageName": "The Light of the Nation Experience",
+    "tagline": "Discover Enterprise & Heritage",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Culture & Commerce",
+    "attractions": [
+      "Ogbunike Cave",
+      "Onitsha Experience"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Local Transfers"
+    ],
+    "sortOrder": 10
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southeast",
+    "state": "Enugu State",
+    "packageName": "Coal City Escape",
+    "tagline": "Nature, History & Serenity",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Nature & Heritage",
+    "attractions": [
+      "Ngwo Pine Forest",
+      "Awhum Waterfall"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide",
+      "Local Transfers"
+    ],
+    "sortOrder": 20
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southeast",
+    "state": "Imo State",
+    "packageName": "Eastern Heartland Retreat",
+    "tagline": "Relax. Explore. Connect.",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Leisure Tourism",
+    "attractions": [
+      "Oguta Lake",
+      "Cultural Villages"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers"
+    ],
+    "sortOrder": 30
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southeast",
+    "state": "Abia State",
+    "packageName": "Aba Enterprise Journey",
+    "tagline": "Innovation Meets Culture",
+    "durationDays": 2,
+    "durationNights": 1,
+    "price": 450000,
+    "experienceType": "Commerce Tourism",
+    "attractions": [
+      "Ariaria Market",
+      "Cultural Sites"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 40
+  },
+  {
+    "category": "LOCAL",
+    "region": "Southeast",
+    "state": "Ebonyi State",
+    "packageName": "Salt of the Nation Adventure",
+    "tagline": "Discover Hidden Wonders",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Nature & Agriculture",
+    "attractions": [
+      "Salt Lakes",
+      "Waterfalls"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers",
+      "Tour Guide"
+    ],
+    "sortOrder": 50
+  },
+  {
+    "category": "LOCAL",
+    "region": "North-Central",
+    "state": "Federal Capital Territory, Abuja",
+    "packageName": "Capital Explorer",
+    "tagline": "Discover Nigeria's Seat of Power",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Urban Tourism",
+    "attractions": [
+      "Zuma Rock",
+      "Millennium Park",
+      "City Tour"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers",
+      "Tour Guide"
+    ],
+    "sortOrder": 10
+  },
+  {
+    "category": "LOCAL",
+    "region": "North-Central",
+    "state": "Niger State",
+    "packageName": "The Confluence Adventure",
+    "tagline": "Nature Beyond Imagination",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Adventure Tourism",
+    "attractions": [
+      "Gurara Falls",
+      "Kainji Lake"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers"
+    ],
+    "sortOrder": 20
+  },
+  {
+    "category": "LOCAL",
+    "region": "North-Central",
+    "state": "Kwara State",
+    "packageName": "Harmony Escape",
+    "tagline": "Where Cultures Meet",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Heritage Tourism",
+    "attractions": [
+      "Esie Museum",
+      "Owu Falls"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 30
+  },
+  {
+    "category": "LOCAL",
+    "region": "North-Central",
+    "state": "Kogi State",
+    "packageName": "The Confluence Experience",
+    "tagline": "Where Rivers Meet, Stories Begin",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Nature & Heritage",
+    "attractions": [
+      "River Niger-Benue Confluence"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers"
+    ],
+    "sortOrder": 40
+  },
+  {
+    "category": "LOCAL",
+    "region": "North-Central",
+    "state": "Benue State",
+    "packageName": "Food Basket Discovery",
+    "tagline": "Taste the Heart of Nigeria",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Agro Tourism",
+    "attractions": [
+      "Makurdi Riverfront",
+      "Cultural Experiences"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 50
+  },
+  {
+    "category": "LOCAL",
+    "region": "North-Central",
+    "state": "Plateau State",
+    "packageName": "Jos Highland Escape",
+    "tagline": "Cool Weather, Endless Adventure",
+    "durationDays": 3,
+    "durationNights": 3,
+    "price": 450000,
+    "experienceType": "Mountain Tourism",
+    "attractions": [
+      "Shere Hills",
+      "Wildlife Park"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers",
+      "Tour Guide"
+    ],
+    "sortOrder": 60
+  },
+  {
+    "category": "LOCAL",
+    "region": "North-Central",
+    "state": "Nasarawa State",
+    "packageName": "Hidden Treasures of Nasarawa",
+    "tagline": "Nigeria's Best Kept Secret",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 450000,
+    "experienceType": "Eco Tourism",
+    "attractions": [
+      "Farin Ruwa Falls"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 70
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northwest",
+    "state": "Kano State",
+    "packageName": "Kano Emirate Experience",
+    "tagline": "Journey Through Centuries",
+    "durationDays": 4,
+    "durationNights": 3,
+    "price": 500000,
+    "experienceType": "Heritage Tourism",
+    "attractions": [
+      "Ancient City Walls",
+      "Emir's Palace"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 10
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northwest",
+    "state": "Kaduna State",
+    "packageName": "Northern Gateway Escape",
+    "tagline": "Adventure Meets History",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Heritage & Nature",
+    "attractions": [
+      "Kajuru Castle",
+      "Matsirga Falls"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers"
+    ],
+    "sortOrder": 20
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northwest",
+    "state": "Katsina State",
+    "packageName": "Land of Legends Trail",
+    "tagline": "Experience Timeless Traditions",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Cultural Tourism",
+    "attractions": [
+      "Gobarau Minaret"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 30
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northwest",
+    "state": "Jigawa State",
+    "packageName": "Golden Dunes Journey",
+    "tagline": "Beyond the Ordinary",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Desert Tourism",
+    "attractions": [
+      "Wetlands & Cultural Sites"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers"
+    ],
+    "sortOrder": 40
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northwest",
+    "state": "Sokoto State",
+    "packageName": "Caliphate Heritage Tour",
+    "tagline": "Discover the Legacy of Leaders",
+    "durationDays": 4,
+    "durationNights": 3,
+    "price": 500000,
+    "experienceType": "Historical Tourism",
+    "attractions": [
+      "Sultan's Palace",
+      "Museum"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 50
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northwest",
+    "state": "Kebbi State",
+    "packageName": "Argungu Adventure",
+    "tagline": "Tradition on the Water",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Festival Tourism",
+    "attractions": [
+      "Argungu Festival Grounds"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers"
+    ],
+    "sortOrder": 60
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northwest",
+    "state": "Zamfara State",
+    "packageName": "Northern Frontier Experience",
+    "tagline": "Discover Untold Stories",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Cultural Tourism",
+    "attractions": [
+      "Heritage Communities"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 70
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northeast",
+    "state": "Adamawa State",
+    "packageName": "Highlands of Adamawa",
+    "tagline": "Adventure Above the Clouds",
+    "durationDays": 4,
+    "durationNights": 3,
+    "price": 500000,
+    "experienceType": "Mountain Tourism",
+    "attractions": [
+      "Mambilla Plateau Region"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide",
+      "Local Transfers"
+    ],
+    "sortOrder": 10
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northeast",
+    "state": "Taraba State",
+    "packageName": "Nature's Masterpiece Escape",
+    "tagline": "Explore Nigeria's Green Frontier",
+    "durationDays": 4,
+    "durationNights": 3,
+    "price": 500000,
+    "experienceType": "Eco Tourism",
+    "attractions": [
+      "Gashaka Gumti National Park"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 20
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northeast",
+    "state": "Borno State",
+    "packageName": "Lake Chad Heritage Journey",
+    "tagline": "Discover Ancient Trade Routes",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Historical Tourism",
+    "attractions": [
+      "Cultural Heritage Experiences"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 30
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northeast",
+    "state": "Yobe State",
+    "packageName": "Desert Discovery Trail",
+    "tagline": "Experience Northern Horizons",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Desert Tourism",
+    "attractions": [
+      "Dune Landscapes"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Local Transfers"
+    ],
+    "sortOrder": 40
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northeast",
+    "state": "Bauchi State",
+    "packageName": "Yankari Wildlife Safari",
+    "tagline": "Africa's Wild Side Awaits",
+    "durationDays": 5,
+    "durationNights": 4,
+    "price": 550000,
+    "experienceType": "Safari Tourism",
+    "attractions": [
+      "Yankari Game Reserve"
+    ],
+    "inclusions": [
+      "Resort Accommodation",
+      "Safari Guide",
+      "Local Transfers"
+    ],
+    "sortOrder": 50
+  },
+  {
+    "category": "LOCAL",
+    "region": "Northeast",
+    "state": "Gombe State",
+    "packageName": "Jewel of the Savannah",
+    "tagline": "Discover Untamed Beauty",
+    "durationDays": 3,
+    "durationNights": 2,
+    "price": 500000,
+    "experienceType": "Eco Tourism",
+    "attractions": [
+      "Savannah Landscapes"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Tour Guide"
+    ],
+    "sortOrder": 60
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Passport Builder",
+    "state": "Ghana",
+    "packageName": "The Gold Coast Experience",
+    "tagline": "Adventure Along Coast",
+    "durationDays": 4,
+    "durationNights": 3,
+    "priceSingle": 1200000,
+    "priceSharing": 1000000,
+    "experienceType": "Coastal Experience",
+    "attractions": [
+      "Coast Tourism"
+    ],
+    "inclusions": [
+      "Airport Transfers",
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 10
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Passport Builder",
+    "state": "Togo & Benin",
+    "packageName": "Weekend in Coastal Cities",
+    "tagline": "Explore Nigeria's Green Frontier",
+    "durationDays": 4,
+    "durationNights": 3,
+    "priceSingle": 800000,
+    "priceSharing": 600000,
+    "experienceType": "Passport Builder",
+    "attractions": [
+      "Road Transport"
+    ],
+    "inclusions": [
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 20
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Passport Builder",
+    "state": "Rwanda",
+    "packageName": "Uncover Kigali's Gems",
+    "tagline": "Discover the clean city of Kigali",
+    "durationDays": 5,
+    "durationNights": 4,
+    "priceSingle": 1700000,
+    "priceSharing": 1500000,
+    "experienceType": "Afro Tourism",
+    "attractions": [
+      "The City of Kigali"
+    ],
+    "inclusions": [
+      "Airport Transfers",
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 30
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Passport Builder",
+    "state": "Lebanon",
+    "packageName": "Explore Lebanon",
+    "tagline": "Ancient Wonders and Timeless Energy",
+    "durationDays": 5,
+    "durationNights": 4,
+    "priceSingle": 2200000,
+    "priceSharing": 1950000,
+    "experienceType": "Passport Builder",
+    "attractions": [
+      "Nature & Adventure"
+    ],
+    "inclusions": [
+      "Airport Transfers",
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 40
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Passport Builder",
+    "state": "Qatar",
+    "packageName": "Doha Summer Rave",
+    "tagline": "Desert Escape",
+    "durationDays": 5,
+    "durationNights": 4,
+    "priceSingle": 2950000,
+    "priceSharing": 2550000,
+    "experienceType": "Desert Escape",
+    "attractions": [
+      "City Tourism"
+    ],
+    "inclusions": [
+      "Airport Transfers",
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 50
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Passport Builder",
+    "state": "Rwanda & Kenya",
+    "packageName": "Wild Nairobi, Serene Kigali",
+    "tagline": "Discover Untamed Beauty",
+    "durationDays": 5,
+    "durationNights": 4,
+    "priceSingle": 3200000,
+    "priceSharing": 2800000,
+    "experienceType": "Afro Tourism",
+    "attractions": [
+      "Nature & Adventure"
+    ],
+    "inclusions": [
+      "Airport Transfers",
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 60
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Passport Builder",
+    "state": "Egypt & Lebanon",
+    "packageName": "Ancient Wonders",
+    "tagline": "Ancient Wonders and Timeless Energy",
+    "durationDays": 5,
+    "durationNights": 4,
+    "priceSingle": 3700000,
+    "priceSharing": 3300000,
+    "experienceType": "Passport Builder",
+    "attractions": [
+      "Historical Adventure"
+    ],
+    "inclusions": [
+      "Airport Transfers",
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 70
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Passport Builder",
+    "state": "Nairobi & Zanzibar",
+    "packageName": "Wild & Blue",
+    "tagline": "From The Beach to The City",
+    "durationDays": 5,
+    "durationNights": 4,
+    "priceSingle": 3990000,
+    "priceSharing": 3500000,
+    "experienceType": "Passport Builder",
+    "attractions": [
+      "Beach & Wildness"
+    ],
+    "inclusions": [
+      "Airport Transfers",
+      "Hotel Accommodation",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 80
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Squad Deals",
+    "state": "Kenya & Qatar",
+    "packageName": "Nairobi & Doha",
+    "tagline": "Wild Nairobi, Adventurous Doha",
+    "durationDays": 6,
+    "durationNights": 5,
+    "priceSingle": 3990000,
+    "priceSharing": 3590000,
+    "experienceType": "Squad Deal",
+    "attractions": [
+      "Nairobi City Attractions",
+      "Qatari Desert",
+      "Souq Waqif",
+      "Museum of Islamic Art",
+      "Katara Cultural Village",
+      "Banana Island",
+      "Cruise along Doha Corniche"
+    ],
+    "inclusions": [
+      "Visa",
+      "Return Flight Tickets",
+      "Airport Transfers",
+      "5 Nights in a Villa",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 10
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Squad Deals",
+    "state": "Rwanda & Qatar",
+    "packageName": "Kigali & Doha",
+    "tagline": "City Lights & Desert Escape",
+    "durationDays": 6,
+    "durationNights": 5,
+    "priceSingle": 3800000,
+    "priceSharing": 3390000,
+    "experienceType": "Squad Deal",
+    "attractions": [
+      "Gorilla Trekking at Volcanoes National Park",
+      "Lake Kivu",
+      "Genocide Memorial Ground"
+    ],
+    "inclusions": [
+      "Visa",
+      "Return Flight Tickets",
+      "Airport Transfers",
+      "5 Nights in a Villa",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 20
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Squad Deals",
+    "state": "Tanzania & Qatar",
+    "packageName": "Zanzibar & Doha",
+    "tagline": "From Beach To City",
+    "durationDays": 6,
+    "durationNights": 5,
+    "priceSingle": 3990000,
+    "priceSharing": 3690000,
+    "experienceType": "Squad Deal",
+    "attractions": [
+      "Zanzibar Beaches",
+      "Qatar Destinations"
+    ],
+    "inclusions": [
+      "Visa",
+      "Return Flight Tickets",
+      "Airport Transfers",
+      "5 Nights in a Villa",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 30
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Squad Deals",
+    "state": "Seychelles & Qatar",
+    "packageName": "Seychelles & Doha",
+    "tagline": "Beach vs Desert",
+    "durationDays": 6,
+    "durationNights": 5,
+    "priceSingle": 3990000,
+    "priceSharing": 3690000,
+    "experienceType": "Squad Deal",
+    "attractions": [
+      "Seychelles Attraction Destinations"
+    ],
+    "inclusions": [
+      "Visa",
+      "Return Flight Tickets",
+      "Airport Transfers",
+      "5 Nights in a Villa",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 40
+  },
+  {
+    "category": "INTERNATIONAL",
+    "region": "Squad Deals",
+    "state": "Benin, Togo, Ghana",
+    "packageName": "Cotonou, Togo & Accra",
+    "tagline": "Clear Coast Adventure",
+    "durationDays": 7,
+    "durationNights": 6,
+    "priceSingle": 1500000,
+    "priceSharing": 1250000,
+    "experienceType": "Squad Deal",
+    "attractions": [],
+    "inclusions": [
+      "Visa",
+      "Return Flight Tickets",
+      "Airport Transfers",
+      "5 Nights in a Villa",
+      "Daily Breakfast",
+      "Tour Guide"
+    ],
+    "sortOrder": 50
+  }
+]

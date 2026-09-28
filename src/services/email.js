@@ -262,12 +262,12 @@ const emails = {
           ${infoRow('Booking Ref', `<span style="font-family:monospace;font-size:14px;letter-spacing:0.05em;">${booking.ref}</span>`)}
           ${infoRow('Package', booking.holiday?.packageName || '—')}
           ${infoRow('Destination', booking.holiday?.state || '—')}
-          ${infoRow('Tier', booking.tier)}
+          ${booking.occupancy ? infoRow('Room', booking.occupancy === 'SINGLE' ? 'Single occupancy' : 'Per person sharing') : ''}
           ${infoRow('Travel Date', booking.holidayDate?.date ? new Date(booking.holidayDate.date).toDateString() : '—')}
           ${infoRow('Travellers', booking.travellers)}
           ${infoRow('Lead Traveller', booking.leadName || '—')}
           ${travellerRows}
-          ${infoRow('Tier Cost', `₦${(booking.tierAmount || 0).toLocaleString()}`)}
+          ${infoRow('Package Cost', booking.unitPrice ? `₦${booking.unitPrice.toLocaleString()} × ${booking.travellers} = ₦${(booking.tierAmount || 0).toLocaleString()}` : `₦${(booking.tierAmount || 0).toLocaleString()}`)}
           ${booking.membershipAdded ? infoRow('Travel Club Membership', `₦${(booking.membershipAmount || 0).toLocaleString()}`) : ''}
           ${infoRow('Total Paid', `<strong style="color:#16a34a;">₦${(booking.totalAmount || 0).toLocaleString()}</strong>`)}
         `)}

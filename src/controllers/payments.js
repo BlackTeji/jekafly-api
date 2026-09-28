@@ -17,7 +17,18 @@ exports.initiate = async (req, res, next) => {
       email: z.string().email(),
       metadata: z.any().optional(),
     });
-    const { type, ref, amount, email, metadata } = schema.parse(req.body);
+    const parsed = schema.parse(req.body);
+    const { type, ref, email, metadata } = parsed;
+    let amount = parsed.amount;
+
+    if (type === 'HOLIDAY') {
+      const bookingRef = metadata && metadata.bookingRef;
+      if (!bookingRef) throw new ApiError('Holiday booking reference is missing. Please restart your booking.', 400);
+      const booking = await prisma.holidayBooking.findUnique({ where: { ref: String(bookingRef) } });
+      if (!booking || booking.userId !== req.user.id) throw new ApiError('Holiday booking not found.', 404);
+      if (booking.status !== 'PENDING') throw new ApiError('This holiday booking is no longer awaiting payment.', 400);
+      amount = booking.totalAmount;
+    }
 
     const amountKobo = Math.round(amount * 100);
 
@@ -220,11 +231,11 @@ async function handleHolidayPaymentSuccess(payment, reference) {
     data: { status: 'CONFIRMED', paymentRef: reference, paidAt: new Date() },
   });
 
-  if (meta.membershipAdded) {
+  if (booking.membershipAdded) {
     const now = new Date();
     const expiry = new Date(now);
     expiry.setFullYear(expiry.getFullYear() + 1);
-    const amountPaid = Math.round(Number(meta.membershipAmount) || 0);
+    const amountPaid = Math.round(Number(booking.membershipAmount) || 0);
 
     const existing = await prisma.clubMembership.findUnique({ where: { userId: payment.userId } });
     if (existing) {

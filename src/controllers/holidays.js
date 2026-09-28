@@ -8,14 +8,143 @@ const REGION_ORDER = [
     'North-Central',
     'Northwest',
     'Northeast',
+    'Passport Builder',
+    'Squad Deals',
 ];
+
+const CATEGORIES = ['LOCAL', 'INTERNATIONAL'];
+const STATUSES = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
+const OCCUPANCIES = ['SINGLE', 'SHARING'];
+const MAX_TRAVELLERS = 20;
+
+function legacyTierPrice(h) {
+    if (!h.tier) return null;
+    const key = `price${h.tier.charAt(0) + h.tier.slice(1).toLowerCase()}`;
+    return h[key] ?? null;
+}
+
+function standardPrice(h) {
+    return h.price ?? legacyTierPrice(h);
+}
+
+function startingPrice(h) {
+    if (h.category === 'INTERNATIONAL') {
+        const opts = [h.priceSharing, h.priceSingle].filter(v => Number.isInteger(v) && v > 0);
+        return opts.length ? Math.min(...opts) : null;
+    }
+    return standardPrice(h);
+}
+
+function unitPriceFor(h, occupancy) {
+    if (h.category === 'INTERNATIONAL') {
+        if (occupancy === 'SINGLE') return h.priceSingle ?? null;
+        if (occupancy === 'SHARING') return h.priceSharing ?? null;
+        return null;
+    }
+    return standardPrice(h);
+}
+
+function publicHoliday(h) {
+    const { priceExplorer, priceSignature, priceExecutive, tier, ...rest } = h;
+    return { ...rest, price: standardPrice(h), startingPrice: startingPrice(h) };
+}
+
+function toList(val) {
+    if (Array.isArray(val)) return val.map(v => String(v).trim()).filter(Boolean);
+    if (typeof val === 'string') return val.split(/\r?\n/).map(v => v.trim()).filter(Boolean);
+    return [];
+}
+
+function toPrice(val, label) {
+    if (val === null || val === '' || val === undefined) return null;
+    const n = typeof val === 'number' ? val : parseInt(String(val).replace(/[^\d]/g, ''), 10);
+    if (!Number.isInteger(n) || n <= 0) throw new Error(`INVALID:${label} must be a whole naira amount above 0`);
+    return n;
+}
+
+function toCount(val, label, min) {
+    const n = parseInt(val, 10);
+    if (!Number.isInteger(n) || n < min || n > 60) throw new Error(`INVALID:${label} must be a number between ${min} and 60`);
+    return n;
+}
+
+function buildHolidayData(body, existing) {
+    const data = {};
+    const has = (k) => Object.prototype.hasOwnProperty.call(body, k);
+    const text = (k, label, max, required) => {
+        if (!has(k)) return;
+        const v = String(body[k] ?? '').trim().slice(0, max);
+        if (required && !v) throw new Error(`INVALID:${label} is required`);
+        data[k] = v;
+    };
+
+    if (has('category')) {
+        const c = String(body.category || '').toUpperCase();
+        if (!CATEGORIES.includes(c)) throw new Error('INVALID:Category must be LOCAL or INTERNATIONAL');
+        data.category = c;
+    }
+    text('region', 'Collection', 80, true);
+    text('state', 'Destination', 120, true);
+    text('packageName', 'Package name', 160, true);
+    text('tagline', 'Tagline', 200, false);
+    text('experienceType', 'Experience identity', 200, false);
+    if (has('notes')) data.notes = String(body.notes ?? '').trim().slice(0, 2000) || null;
+
+    if (has('durationDays')) data.durationDays = toCount(body.durationDays, 'Days', 1);
+    if (has('durationNights')) data.durationNights = toCount(body.durationNights, 'Nights', 0);
+
+    if (has('price')) data.price = toPrice(body.price, 'Price');
+    if (has('priceSingle')) data.priceSingle = toPrice(body.priceSingle, 'Single occupancy price');
+    if (has('priceSharing')) data.priceSharing = toPrice(body.priceSharing, 'Per person sharing price');
+
+    if (has('attractions')) data.attractions = toList(body.attractions).slice(0, 40);
+    if (has('inclusions')) data.inclusions = toList(body.inclusions).slice(0, 40);
+    if (has('images')) data.images = toList(body.images).slice(0, 10);
+
+    if (has('sortOrder')) {
+        const n = parseInt(body.sortOrder, 10);
+        data.sortOrder = Number.isInteger(n) ? n : 0;
+    }
+    if (has('status')) {
+        const s = String(body.status || '').toUpperCase();
+        if (!STATUSES.includes(s)) throw new Error('INVALID:Status must be ACTIVE, DRAFT or ARCHIVED');
+        data.status = s;
+    }
+
+    const merged = { ...(existing || {}), ...data };
+    const category = merged.category || 'LOCAL';
+    if ((merged.durationNights ?? 0) > (merged.durationDays ?? 0)) {
+        throw new Error('INVALID:Nights cannot be more than days');
+    }
+    if (merged.status === 'ACTIVE') {
+        if (category === 'LOCAL' && !standardPrice(merged)) {
+            throw new Error('INVALID:An active local package needs a price');
+        }
+        if (category === 'INTERNATIONAL' && !merged.priceSingle && !merged.priceSharing) {
+            throw new Error('INVALID:An active international package needs a single or sharing price');
+        }
+    }
+    return data;
+}
+
+function sendInvalid(res, err) {
+    if (err && typeof err.message === 'string' && err.message.startsWith('INVALID:')) {
+        res.status(400).json({ ok: false, error: err.message.slice(8) });
+        return true;
+    }
+    if (err && err.code === 'P2002') {
+        res.status(400).json({ ok: false, error: 'A package with this name already exists for this destination' });
+        return true;
+    }
+    return false;
+}
 
 async function listHolidays(req, res) {
     try {
-        const { region, tier } = req.query;
+        const { region, category } = req.query;
         const where = { status: 'ACTIVE' };
         if (region) where.region = region;
-        if (tier) where.tier = tier.toUpperCase();
+        if (category && CATEGORIES.includes(String(category).toUpperCase())) where.category = String(category).toUpperCase();
 
         const holidays = await db.holiday.findMany({
             where,
@@ -25,13 +154,13 @@ async function listHolidays(req, res) {
                     orderBy: { date: 'asc' },
                 },
             },
-            orderBy: [{ region: 'asc' }, { packageName: 'asc' }],
+            orderBy: [{ sortOrder: 'asc' }, { packageName: 'asc' }],
         });
 
         const withAvailability = holidays.map(h => {
             const openDates = h.dates.filter(d => d.bookedCount < d.capacity);
             return {
-                ...h,
+                ...publicHoliday(h),
                 hasAvailability: openDates.length > 0,
                 dates: openDates.slice(0, 3),
             };
@@ -43,8 +172,10 @@ async function listHolidays(req, res) {
             grouped[h.region].push(h);
         }
 
-        const ordered = REGION_ORDER.filter(r => grouped[r]).map(r => ({
+        const extra = Object.keys(grouped).filter(r => !REGION_ORDER.includes(r)).sort();
+        const ordered = [...REGION_ORDER.filter(r => grouped[r]), ...extra].map(r => ({
             region: r,
+            category: grouped[r][0].category,
             packages: grouped[r],
         }));
 
@@ -61,7 +192,7 @@ async function getHoliday(req, res) {
             where: { id: req.params.id },
         });
 
-        if (!holiday) return res.status(404).json({ ok: false, error: 'Package not found' });
+        if (!holiday || holiday.status !== 'ACTIVE') return res.status(404).json({ ok: false, error: 'Package not found' });
 
         const dates = await db.holidayDate.findMany({
             where: {
@@ -79,7 +210,7 @@ async function getHoliday(req, res) {
 
         const hasAvailability = availableDates.some(d => !d.isFull);
 
-        return res.json({ ok: true, data: { holiday: { ...holiday, availableDates, hasAvailability } } });
+        return res.json({ ok: true, data: { holiday: { ...publicHoliday(holiday), availableDates, hasAvailability } } });
     } catch (err) {
         console.error('getHoliday error:', err);
         return res.status(500).json({ ok: false, error: 'Failed to load package' });
@@ -117,8 +248,7 @@ async function createBooking(req, res) {
         const {
             holidayId,
             holidayDateId,
-            tier,
-            travellers,
+            occupancy,
             leadName,
             leadEmail,
             leadPhone,
@@ -127,9 +257,13 @@ async function createBooking(req, res) {
         } = req.body;
 
         const userId = req.user.id;
+        const travellers = parseInt(req.body.travellers, 10);
 
-        if (!holidayId || !holidayDateId || !tier || !travellers || !leadName || !leadEmail) {
+        if (!holidayId || !holidayDateId || !leadName || !leadEmail) {
             return res.status(400).json({ ok: false, error: 'Missing required fields' });
+        }
+        if (!Number.isInteger(travellers) || travellers < 1 || travellers > MAX_TRAVELLERS) {
+            return res.status(400).json({ ok: false, error: `Travellers must be between 1 and ${MAX_TRAVELLERS}` });
         }
 
         const rawAdditional = Array.isArray(additionalTravellers) ? additionalTravellers : [];
@@ -144,11 +278,6 @@ async function createBooking(req, res) {
             return res.status(400).json({ ok: false, error: 'Please provide a full name for every additional traveller' });
         }
 
-        const validTiers = ['EXPLORER', 'SIGNATURE', 'EXECUTIVE'];
-        if (!validTiers.includes(tier.toUpperCase())) {
-            return res.status(400).json({ ok: false, error: 'Invalid tier' });
-        }
-
         const holiday = await db.holiday.findUnique({ where: { id: holidayId } });
         if (!holiday || holiday.status !== 'ACTIVE') {
             return res.status(404).json({ ok: false, error: 'Package not found' });
@@ -158,17 +287,27 @@ async function createBooking(req, res) {
         if (!slot || slot.holidayId !== holidayId) {
             return res.status(404).json({ ok: false, error: 'Date not found' });
         }
+        if (new Date(slot.date) < new Date()) {
+            return res.status(400).json({ ok: false, error: 'This date has already passed' });
+        }
         if (slot.bookedCount + travellers > slot.capacity) {
             return res.status(400).json({ ok: false, error: 'Not enough availability for this date' });
         }
 
-        const tierKey = `price${tier.charAt(0) + tier.slice(1).toLowerCase()}`;
-        const tierPrice = holiday[tierKey];
-        if (!tierPrice) {
-            return res.status(400).json({ ok: false, error: 'This tier is not available for this package' });
+        let occ = null;
+        if (holiday.category === 'INTERNATIONAL') {
+            occ = String(occupancy || '').toUpperCase();
+            if (!OCCUPANCIES.includes(occ)) {
+                return res.status(400).json({ ok: false, error: 'Please choose single occupancy or per person sharing' });
+            }
         }
 
-        const tierAmount = tierPrice * travellers;
+        const unitPrice = unitPriceFor(holiday, occ);
+        if (!unitPrice) {
+            return res.status(400).json({ ok: false, error: 'This package is not currently priced for that option' });
+        }
+
+        const tierAmount = unitPrice * travellers;
 
         let membershipAmount = 0;
         let membershipAdded = false;
@@ -194,7 +333,9 @@ async function createBooking(req, res) {
                 userId,
                 holidayId,
                 holidayDateId,
-                tier: tier.toUpperCase(),
+                tier: null,
+                occupancy: occ,
+                unitPrice,
                 travellers,
                 leadName,
                 leadEmail,
@@ -216,6 +357,8 @@ async function createBooking(req, res) {
                     ref: booking.ref,
                     totalAmount,
                     tierAmount,
+                    unitPrice,
+                    occupancy: occ,
                     membershipAdded,
                     membershipAmount,
                 },
@@ -237,7 +380,7 @@ async function myBookings(req, res) {
                         packageName: true,
                         state: true,
                         region: true,
-                        tier: true,
+                        category: true,
                         durationDays: true,
                         durationNights: true,
                         images: true,
@@ -260,10 +403,19 @@ async function myBookings(req, res) {
 async function adminListPackages(req, res) {
     try {
         const holidays = await db.holiday.findMany({
-            include: { dates: { orderBy: { date: 'asc' } } },
-            orderBy: [{ region: 'asc' }, { packageName: 'asc' }],
+            include: {
+                dates: { orderBy: { date: 'asc' } },
+                _count: { select: { bookings: true } },
+            },
+            orderBy: [{ category: 'asc' }, { region: 'asc' }, { sortOrder: 'asc' }, { packageName: 'asc' }],
         });
-        return res.json({ ok: true, data: { holidays } });
+        return res.json({
+            ok: true,
+            data: {
+                holidays: holidays.map(h => ({ ...h, price: standardPrice(h), startingPrice: startingPrice(h) })),
+                collections: REGION_ORDER,
+            },
+        });
     } catch (err) {
         console.error('adminListPackages error:', err);
         return res.status(500).json({ ok: false, error: 'Failed to load packages' });
@@ -423,31 +575,38 @@ async function adminUpdateBookingStatus(req, res) {
     }
 }
 
+async function adminCreateHoliday(req, res) {
+    try {
+        const body = { status: 'DRAFT', category: 'LOCAL', durationDays: 3, durationNights: 2, attractions: [], inclusions: [], ...req.body };
+        for (const k of ['region', 'state', 'packageName']) {
+            if (!String(body[k] || '').trim()) {
+                return res.status(400).json({ ok: false, error: 'Collection, destination and package name are required' });
+            }
+        }
+        const data = buildHolidayData(body, null);
+        const created = await db.holiday.create({
+            data: {
+                tagline: '',
+                experienceType: '',
+                ...data,
+            },
+        });
+        return res.status(201).json({ ok: true, data: { holiday: created } });
+    } catch (err) {
+        if (sendInvalid(res, err)) return;
+        console.error('adminCreateHoliday error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to create package' });
+    }
+}
+
 async function adminUpdateHoliday(req, res) {
     try {
-        const { priceExplorer, priceSignature, priceExecutive, status } = req.body;
-
         const holiday = await db.holiday.findUnique({ where: { id: req.params.id } });
         if (!holiday) return res.status(404).json({ ok: false, error: 'Package not found' });
 
-        const data = {};
-        for (const [key, val] of [['priceExplorer', priceExplorer], ['priceSignature', priceSignature], ['priceExecutive', priceExecutive]]) {
-            if (val === undefined) continue;
-            if (val === null || val === '') { data[key] = null; continue; }
-            const n = parseInt(val, 10);
-            if (isNaN(n) || n < 0) {
-                return res.status(400).json({ ok: false, error: `Invalid value for ${key}` });
-            }
-            data[key] = n;
-        }
-
-        if (status !== undefined) {
-            const validStatuses = ['ACTIVE', 'DRAFT', 'ARCHIVED'];
-            if (!validStatuses.includes(status.toUpperCase())) {
-                return res.status(400).json({ ok: false, error: 'Invalid status' });
-            }
-            data.status = status.toUpperCase();
-        }
+        const body = { ...req.body };
+        delete body.id;
+        const data = buildHolidayData(body, holiday);
 
         const updated = await db.holiday.update({
             where: { id: req.params.id },
@@ -456,8 +615,27 @@ async function adminUpdateHoliday(req, res) {
 
         return res.json({ ok: true, data: { holiday: updated } });
     } catch (err) {
+        if (sendInvalid(res, err)) return;
         console.error('adminUpdateHoliday error:', err);
         return res.status(500).json({ ok: false, error: 'Failed to update package' });
+    }
+}
+
+async function adminDeleteHoliday(req, res) {
+    try {
+        const holiday = await db.holiday.findUnique({
+            where: { id: req.params.id },
+            include: { _count: { select: { bookings: true } } },
+        });
+        if (!holiday) return res.status(404).json({ ok: false, error: 'Package not found' });
+        if (holiday._count.bookings > 0) {
+            return res.status(400).json({ ok: false, error: 'This package has bookings. Archive it instead of deleting it.' });
+        }
+        await db.holiday.delete({ where: { id: req.params.id } });
+        return res.json({ ok: true });
+    } catch (err) {
+        console.error('adminDeleteHoliday error:', err);
+        return res.status(500).json({ ok: false, error: 'Failed to delete package' });
     }
 }
 
@@ -465,4 +643,6 @@ module.exports = {
     listHolidays, getHoliday, getAvailability, createBooking, myBookings,
     adminListPackages, adminCreateDate, adminUpdateDate, adminDeleteDate,
     adminListBookings, adminUpdateBookingStatus, adminUpdateHoliday,
+    adminCreateHoliday, adminDeleteHoliday,
+    _internal: { buildHolidayData, unitPriceFor, startingPrice, standardPrice },
 };
