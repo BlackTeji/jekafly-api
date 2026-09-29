@@ -1,9 +1,13 @@
 const prisma = require('../utils/prisma');
 
 const VISA_FEE_FALLBACK = {
-  'United Kingdom': 185000, 'United States': 220000, 'Canada': 195000,
-  'Australia': 210000, 'France': 160000, 'Germany': 160000, 'UAE': 95000,
-  'Japan': 175000, 'China': 180000, 'South Africa': 120000,
+  'United Kingdom': 185000, 'United States': 220000, 'Canada': 195000, 'Australia': 210000,
+  'France': 160000, 'Germany': 160000, 'UAE': 95000, 'Japan': 175000,
+  'China': 180000, 'South Africa': 120000, 'Italy': 155000, 'Spain': 155000,
+  'Netherlands': 155000, 'Portugal': 155000, 'Belgium': 155000, 'Switzerland': 170000,
+  'Sweden': 160000, 'Norway': 160000, 'Denmark': 160000, 'Turkey': 85000,
+  'India': 75000, 'Brazil': 130000, 'Saudi Arabia': 90000, 'Ghana': 60000,
+  'Kenya': 65000, 'Egypt': 70000,
 };
 const DEFAULT_VISA_FEE = 120000;
 const DEFAULT_SERVICE_FEE = 25000;
@@ -88,8 +92,15 @@ async function clubQuote() {
   return { total: pricing.clubMembershipFee };
 }
 
+function defaultVisaFee(country) {
+  return VISA_FEE_FALLBACK[country] || DEFAULT_VISA_FEE;
+}
+
 module.exports = {
   getPricing,
+  defaultVisaFee,
+  VISA_FEE_FALLBACK,
+  DEFAULT_VISA_FEE,
   visaQuote,
   insuranceQuote,
   consultationQuote,
