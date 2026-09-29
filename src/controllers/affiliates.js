@@ -54,7 +54,7 @@ exports.getMe = async (req, res, next) => {
             where: { userId: req.user.id },
             include: { payouts: { orderBy: { requestedAt: 'desc' }, take: 10 } },
         });
-        if (!affiliate) throw new ApiError('Affiliate profile not found.', 404);
+        if (!affiliate) return res.json({ ok: true, data: { affiliate: null } });
         res.json({
             ok: true,
             data: {
@@ -207,6 +207,13 @@ exports.adminProcessPayout = async (req, res, next) => {
                 data: { totalPaid: { increment: payout.amount }, balance: { decrement: payout.amount } },
             }),
         ]);
+        if (payout.affiliate && payout.affiliate.userId) {
+            require('../services/sse').sendToUser(payout.affiliate.userId, 'payout:processed', {
+                payoutId: payout.id,
+                amount: payout.amount / 100,
+                ts: new Date().toISOString(),
+            });
+        }
         res.json({ ok: true, data: { message: 'Payout marked as processed.' } });
     } catch (err) { next(err); }
 };

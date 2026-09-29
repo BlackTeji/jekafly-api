@@ -1,9 +1,16 @@
 'use strict';
 const router = require('express').Router();
 const { authenticate } = require('../middleware/auth');
+
+function tokenFromQuery(req, res, next) {
+    if (!req.headers.authorization && typeof req.query.token === 'string' && req.query.token) {
+        req.headers.authorization = 'Bearer ' + req.query.token;
+    }
+    next();
+}
 const sse = require('../services/sse');
 
-router.get('/', authenticate, (req, res) => {
+router.get('/', tokenFromQuery, authenticate, (req, res) => {
     res.setHeader('Content-Type', 'text/event-stream');
     res.setHeader('Cache-Control', 'no-cache');
     res.setHeader('Connection', 'keep-alive');

@@ -3,6 +3,7 @@ const prisma = require('../utils/prisma');
 const { ApiError } = require('../middleware/error');
 const { generateRef } = require('../utils/ref');
 const { emails } = require('../services/email');
+const pricing = require('../services/pricing');
 
 const appSchema = z.object({
   destination: z.string().min(1),
@@ -47,6 +48,9 @@ exports.create = async (req, res, next) => {
       ? 'Application received. Documents submitted — under review.'
       : 'Application received. Awaiting document submission.';
 
+    const extraTravellers = Array.isArray(data.travellers) ? data.travellers.length : 0;
+    const quote = await pricing.visaQuote(data.destination, extraTravellers);
+
     const app = await prisma.application.create({
       data: {
         ref,
@@ -65,8 +69,8 @@ exports.create = async (req, res, next) => {
         passportIssueDate: toDate(data.passportIssueDate),
         dob: toDate(data.dob),
         travellers: data.travellers || [],
-        feeBreakdown: data.feeBreakdown,
-        fee: data.fee ? Math.round(data.fee * 100) : 0,
+        feeBreakdown: quote,
+        fee: quote.total * 100,
         referralCode: data.referralCode || null,
         agentSubmitted: data.agentSubmitted || false,
         status: initialStatus,

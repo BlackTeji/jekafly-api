@@ -47,13 +47,24 @@ async function join(req, res) {
             return res.status(400).json({ ok: false, error: 'Payment reference required' });
         }
 
+        const payment = await db.payment.findUnique({ where: { reference: String(paymentRef) } });
+        if (!payment || payment.userId !== userId || payment.type !== 'CLUB_MEMBERSHIP' || payment.status !== 'SUCCESS') {
+            return res.status(400).json({ ok: false, error: 'No completed Travel Club payment found for this reference' });
+        }
+
         const existing = await db.clubMembership.findUnique({ where: { userId } });
+        if (existing && existing.paymentRef === payment.reference && existing.status === 'ACTIVE') {
+            return res.status(200).json({
+                ok: true,
+                data: { membership: { status: existing.status, startDate: existing.startDate, expiryDate: existing.expiryDate } },
+            });
+        }
         if (existing && existing.status === 'ACTIVE' && existing.expiryDate > new Date()) {
             return res.status(400).json({ ok: false, error: 'Already an active Travel Club member' });
         }
 
-        const pricing = await db.pricingConfig.findUnique({ where: { id: 'singleton' } });
-        const fee = pricing?.clubMembershipFee || 150000;
+        const fee = Math.round(payment.amount / 100);
+        const paymentRefVerified = payment.reference;
 
         const startDate = new Date();
         const expiryDate = new Date(startDate);
@@ -68,7 +79,7 @@ async function join(req, res) {
                     startDate,
                     expiryDate,
                     amountPaid: fee,
-                    paymentRef,
+                    paymentRef: paymentRefVerified,
                 },
             });
         } else {
@@ -79,7 +90,7 @@ async function join(req, res) {
                     startDate,
                     expiryDate,
                     amountPaid: fee,
-                    paymentRef,
+                    paymentRef: paymentRefVerified,
                 },
             });
         }

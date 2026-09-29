@@ -115,6 +115,7 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
+morgan.token('url', (req) => String(req.originalUrl || req.url || '').replace(/([?&]token=)[^&]*/i, '$1[redacted]'));
 if (config.nodeEnv !== 'test') app.use(morgan('combined'));
 
 app.use('/api/', rateLimit({

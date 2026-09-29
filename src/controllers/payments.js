@@ -8,36 +8,74 @@ const paystack = require('../services/paystack');
 const { emails } = require('../services/email');
 const config = require('../config');
 
+const pricing = require('../services/pricing');
+
+async function quoteFor(type, { ref, metadata, userId }) {
+  const meta = metadata && typeof metadata === 'object' ? { ...metadata } : {};
+
+  if (type === 'VISA') {
+    if (!ref) throw new ApiError('Application reference is missing. Please restart your application.', 400);
+    const app = await prisma.application.findUnique({ where: { ref } });
+    if (!app) throw new ApiError('Application not found.', 404);
+    if (app.userId !== userId) throw new ApiError('Not authorised.', 403);
+    if (app.paid) throw new ApiError('This application has already been paid for.', 400);
+    const extra = Array.isArray(app.travellers) ? app.travellers.length : 0;
+    const q = await pricing.visaQuote(app.destination, extra);
+    return { amount: q.total, applicationId: app.id, metadata: { ...meta, destination: app.destination, feeBreakdown: q } };
+  }
+
+  if (type === 'INSURANCE') {
+    const q = await pricing.insuranceQuote(meta.plan, meta.travellers);
+    if (!q) throw new ApiError('Please choose a valid insurance plan and number of travellers.', 400);
+    return { amount: q.total, applicationId: null, metadata: { ...meta, travellers: q.travellers, quote: q } };
+  }
+
+  if (type === 'CONSULTATION') {
+    const q = await pricing.consultationQuote(meta.plan || meta.package);
+    if (!q) throw new ApiError('Please choose a valid consultation package.', 400);
+    return { amount: q.total, applicationId: null, metadata: { ...meta, package: q.package } };
+  }
+
+  if (type === 'HOLIDAY') {
+    const bookingRef = meta.bookingRef;
+    if (!bookingRef) throw new ApiError('Holiday booking reference is missing. Please restart your booking.', 400);
+    const booking = await prisma.holidayBooking.findUnique({ where: { ref: String(bookingRef) } });
+    if (!booking || booking.userId !== userId) throw new ApiError('Holiday booking not found.', 404);
+    if (booking.status !== 'PENDING') throw new ApiError('This holiday booking is no longer awaiting payment.', 400);
+    return { amount: booking.totalAmount, applicationId: null, metadata: meta };
+  }
+
+  if (type === 'CLUB_MEMBERSHIP') {
+    const existing = await prisma.clubMembership.findUnique({ where: { userId } });
+    if (existing && existing.status === 'ACTIVE' && existing.expiryDate > new Date()) {
+      throw new ApiError('You are already an active Travel Club member.', 400);
+    }
+    const q = await pricing.clubQuote();
+    return { amount: q.total, applicationId: null, metadata: meta };
+  }
+
+  throw new ApiError('Online payment for this service is not available yet. Please contact support.', 400);
+}
+
 exports.initiate = async (req, res, next) => {
   try {
     const schema = z.object({
       type: z.enum(['VISA', 'INSURANCE', 'CONSULTATION', 'FLIGHT', 'HOTEL', 'HOLIDAY', 'CLUB_MEMBERSHIP']),
-      ref: z.string().optional(),
-      amount: z.number().min(1),
+      ref: z.string().optional().nullable(),
+      amount: z.number().optional(),
       email: z.string().email(),
       metadata: z.any().optional(),
     });
-    const parsed = schema.parse(req.body);
-    const { type, ref, email, metadata } = parsed;
-    let amount = parsed.amount;
+    const { type, ref, email, metadata } = schema.parse(req.body);
 
-    if (type === 'HOLIDAY') {
-      const bookingRef = metadata && metadata.bookingRef;
-      if (!bookingRef) throw new ApiError('Holiday booking reference is missing. Please restart your booking.', 400);
-      const booking = await prisma.holidayBooking.findUnique({ where: { ref: String(bookingRef) } });
-      if (!booking || booking.userId !== req.user.id) throw new ApiError('Holiday booking not found.', 404);
-      if (booking.status !== 'PENDING') throw new ApiError('This holiday booking is no longer awaiting payment.', 400);
-      amount = booking.totalAmount;
+    const quote = await quoteFor(type, { ref: ref || null, metadata, userId: req.user.id });
+    const amountKobo = Math.round(quote.amount * 100);
+    if (!Number.isInteger(amountKobo) || amountKobo < 100) {
+      throw new ApiError('Could not work out the price for this payment. Please contact support.', 400);
     }
 
-    const amountKobo = Math.round(amount * 100);
-
-    let applicationId = null;
-    if (ref) {
-      const app = await prisma.application.findUnique({ where: { ref } });
-      if (!app) throw new ApiError('Application not found.', 404);
-      if (app.userId !== req.user.id) throw new ApiError('Not authorised.', 403);
-      applicationId = app.id;
+    if (!config.paystack.secretKey) {
+      throw new ApiError('Payment processing is not yet configured. Please contact support.', 503);
     }
 
     const reference = `JKF-${Date.now()}-${crypto.randomBytes(4).toString('hex').toUpperCase()}`;
@@ -45,18 +83,14 @@ exports.initiate = async (req, res, next) => {
     await prisma.payment.create({
       data: {
         userId: req.user.id,
-        applicationId,
+        applicationId: quote.applicationId,
         reference,
         type,
         amount: amountKobo,
         status: 'INITIATED',
-        metadata: metadata || {},
+        metadata: quote.metadata || {},
       },
     });
-
-    if (!config.paystack.secretKey) {
-      throw new ApiError('Payment processing is not yet configured. Please contact support.', 503);
-    }
 
     let paystackData;
     try {
@@ -64,7 +98,7 @@ exports.initiate = async (req, res, next) => {
         email,
         amount: amountKobo,
         reference,
-        metadata: { userId: req.user.id, ref, type, ...metadata },
+        metadata: { userId: req.user.id, ref, type, ...(quote.metadata || {}) },
         callbackUrl: type === 'CONSULTATION'
           ? `${config.frontendUrl}/dashboard?ref=${reference}`
           : `${config.frontendUrl}/payment?ref=${reference}`,
@@ -81,6 +115,7 @@ exports.initiate = async (req, res, next) => {
         accessCode: paystackData.access_code,
         reference: paystackData.reference,
         publicKey: config.paystack.publicKey,
+        amount: quote.amount,
       },
     });
   } catch (err) { next(err); }
@@ -108,22 +143,31 @@ exports.webhook = async (req, res, next) => {
 };
 
 async function handleChargeSuccess(data) {
-  const { reference, amount } = data;
-
+  const { reference } = data;
   const payment = await prisma.payment.findUnique({ where: { reference } });
   if (!payment || payment.status === 'SUCCESS') return;
 
   const verified = await paystack.verifyTransaction(reference);
   if (verified.status !== 'success') return;
-  if (verified.amount !== amount) {
-    console.error(`[Webhook] Amount mismatch for ${reference}`);
-    return;
+  await fulfilPayment(payment, verified);
+}
+
+async function fulfilPayment(payment, verified) {
+  const reference = payment.reference;
+  if (Number(verified.amount) !== payment.amount) {
+    console.error(`[Payment] Amount mismatch for ${reference}: paid ${verified.amount}, expected ${payment.amount}. Not fulfilled — needs manual review.`);
+    await prisma.payment.updateMany({
+      where: { reference, status: 'INITIATED' },
+      data: { status: 'FAILED' },
+    }).catch(() => { });
+    return false;
   }
 
-  await prisma.payment.update({
-    where: { reference },
+  const claimed = await prisma.payment.updateMany({
+    where: { reference, status: { not: 'SUCCESS' } },
     data: { status: 'SUCCESS', paidAt: new Date() },
   });
+  if (claimed.count === 0) return true;
 
   if (payment.type === 'VISA' && payment.applicationId) {
     const [app, docCount] = await Promise.all([
@@ -176,7 +220,7 @@ async function handleChargeSuccess(data) {
         destination: meta.destination || meta.dest,
         travelDate: meta.date ? new Date(meta.date) : null,
         travellers: parseInt(meta.travellers) || 1,
-        amount: amount / 100,
+        amount: payment.amount / 100,
         status: 'active',
       },
     });
@@ -201,6 +245,24 @@ async function handleChargeSuccess(data) {
       console.error('[Holiday Payment Error]', err.message);
     });
   }
+
+  if (payment.type === 'CLUB_MEMBERSHIP') {
+    await activateClubMembership(payment.userId, payment.amount / 100, reference).catch((err) => {
+      console.error('[Club Payment Error]', err.message);
+    });
+  }
+
+  return true;
+}
+
+async function activateClubMembership(userId, amountPaid, paymentRef) {
+  const now = new Date();
+  const expiry = new Date(now);
+  expiry.setFullYear(expiry.getFullYear() + 1);
+  const data = { status: 'ACTIVE', startDate: now, expiryDate: expiry, amountPaid: Math.round(amountPaid), paymentRef };
+  const existing = await prisma.clubMembership.findUnique({ where: { userId } });
+  if (existing) return prisma.clubMembership.update({ where: { userId }, data });
+  return prisma.clubMembership.create({ data: { userId, ...data } });
 }
 
 async function handleHolidayPaymentSuccess(payment, reference) {
@@ -232,35 +294,7 @@ async function handleHolidayPaymentSuccess(payment, reference) {
   });
 
   if (booking.membershipAdded) {
-    const now = new Date();
-    const expiry = new Date(now);
-    expiry.setFullYear(expiry.getFullYear() + 1);
-    const amountPaid = Math.round(Number(booking.membershipAmount) || 0);
-
-    const existing = await prisma.clubMembership.findUnique({ where: { userId: payment.userId } });
-    if (existing) {
-      await prisma.clubMembership.update({
-        where: { userId: payment.userId },
-        data: {
-          status: 'ACTIVE',
-          startDate: now,
-          expiryDate: expiry,
-          amountPaid: amountPaid || existing.amountPaid,
-          paymentRef: reference,
-        },
-      });
-    } else {
-      await prisma.clubMembership.create({
-        data: {
-          userId: payment.userId,
-          status: 'ACTIVE',
-          startDate: now,
-          expiryDate: expiry,
-          amountPaid,
-          paymentRef: reference,
-        },
-      });
-    }
+    await activateClubMembership(payment.userId, Number(booking.membershipAmount) || 0, reference);
   }
 
   const user = await prisma.user.findUnique({
@@ -272,6 +306,10 @@ async function handleHolidayPaymentSuccess(payment, reference) {
   }
 }
 
+function normPassport(v) {
+  return String(v || '').toUpperCase().replace(/[^A-Z0-9]/g, '') || null;
+}
+
 async function creditAffiliateCommission(app, amountKobo) {
   if (!app.referralCode) return;
 
@@ -280,9 +318,23 @@ async function creditAffiliateCommission(app, amountKobo) {
   });
   if (!affiliate || affiliate.status !== 'APPROVED') return;
 
-  if (affiliate.userId && app.userId === affiliate.userId) {
+  if (affiliate.userId && app.userId === affiliate.userId && !app.agentSubmitted) {
     console.log(`[Affiliate] Self-referral blocked (same account) for code ${app.referralCode}.`);
     return;
+  }
+
+  const passport = normPassport(app.passportNumber);
+  if (passport && affiliate.userId) {
+    const own = await prisma.application.findMany({
+      where: { userId: affiliate.userId, agentSubmitted: false, passportNumber: { not: null } },
+      select: { passportNumber: true },
+    });
+    const affiliateUser = await prisma.user.findUnique({ where: { id: affiliate.userId }, select: { email: true } });
+    const sameEmail = affiliateUser && app.email && affiliateUser.email.toLowerCase() === String(app.email).toLowerCase();
+    if (sameEmail || own.some(o => normPassport(o.passportNumber) === passport)) {
+      console.log(`[Affiliate] Self-referral blocked (affiliate's own passport/email) for code ${app.referralCode}, application ${app.ref}.`);
+      return;
+    }
   }
 
   const commission = Math.round(amountKobo * 0.08);
@@ -309,34 +361,10 @@ exports.verify = async (req, res, next) => {
 
     const verified = await paystack.verifyTransaction(reference);
 
+    let status = verified.status;
     if (verified.status === 'success' && payment.status !== 'SUCCESS') {
-      await prisma.payment.update({
-        where: { reference },
-        data: { status: 'SUCCESS', paidAt: new Date() },
-      });
-
-      if (payment.type === 'VISA' && payment.applicationId) {
-        await prisma.application.update({
-          where: { id: payment.applicationId },
-          data: {
-            paid: true,
-            fee: payment.amount,
-            status: 'PROCESSING',
-            statusHistory: {
-              create: {
-                status: 'PROCESSING',
-                note: 'Payment confirmed via verification.',
-              },
-            },
-          },
-        });
-      }
-
-      if (payment.type === 'HOLIDAY') {
-        await handleHolidayPaymentSuccess(payment, reference).catch((err) => {
-          console.error('[Holiday Payment Error]', err.message);
-        });
-      }
+      const ok = await fulfilPayment(payment, verified);
+      if (!ok) status = 'amount_mismatch';
     }
 
     let appRef = null;
@@ -348,17 +376,19 @@ exports.verify = async (req, res, next) => {
       appRef = app?.ref;
     }
 
+    const fresh = await prisma.payment.findUnique({ where: { reference }, select: { paidAt: true } });
+
     res.json({
       ok: true,
       data: {
-        status: verified.status,
+        status,
         amount: verified.amount / 100,
         reference,
         ref: appRef,
         receipt: {
           txRef: reference,
           amount: verified.amount / 100,
-          paidAt: payment.paidAt || new Date(),
+          paidAt: fresh?.paidAt || new Date(),
           metadata: payment.metadata,
         },
       },
