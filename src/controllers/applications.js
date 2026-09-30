@@ -31,6 +31,12 @@ const toDate = (s) => s ? new Date(s) : undefined;
 exports.create = async (req, res, next) => {
   try {
     const data = appSchema.parse(req.body);
+
+    const feeRow = await prisma.fee.findUnique({ where: { country: data.destination } });
+    if (!feeRow || !feeRow.enabled) {
+      throw new ApiError(`Visa processing for ${data.destination} is not currently available.`, 400);
+    }
+
     const ref = await generateRef();
 
     if (data.referralCode) {

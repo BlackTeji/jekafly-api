@@ -10,7 +10,6 @@ const VISA_FEE_FALLBACK = {
   'Kenya': 65000, 'Egypt': 70000,
 };
 const DEFAULT_VISA_FEE = 120000;
-const DEFAULT_SERVICE_FEE = 25000;
 const EXTRA_TRAVELLER_RATE = 0.85;
 const MAX_TRAVELLERS = 20;
 
@@ -45,7 +44,11 @@ async function visaQuote(destination, extraTravellers) {
   const visaFee = feeRow && feeRow.amount > 0
     ? feeRow.amount
     : (VISA_FEE_FALLBACK[destination] || DEFAULT_VISA_FEE);
-  const serviceFee = svcRow && svcRow.amount != null ? svcRow.amount : DEFAULT_SERVICE_FEE;
+  if (!svcRow || svcRow.amount == null) {
+    const { ApiError } = require('../middleware/error');
+    throw new ApiError('The Jekafly service fee has not been set yet. Please contact support.', 503);
+  }
+  const serviceFee = svcRow.amount;
   const extraFee = extra * Math.round(visaFee * EXTRA_TRAVELLER_RATE);
   const subtotal = visaFee + extraFee;
   return { visaFee, extraTravellers: extra, extraFee, subtotal, serviceFee, total: subtotal + serviceFee };

@@ -184,6 +184,10 @@ app.use('/api/v1/events', require('./routes/events'));
 app.use('/api/v1/track', require('./routes/track'));
 app.use('/api/v1/holidays', require('./routes/holidays'));
 app.use('/api/v1/club', require('./routes/club'));
+app.use('/api/v1/advisories', rateLimit({
+  windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false,
+  message: { ok: false, error: 'Too many requests. Please slow down.' },
+}), require('./routes/advisories'));
 
 app.use(notFound);
 app.use(errorHandler);
@@ -266,10 +270,6 @@ async function start() {
         },
       });
     }
-
-    await db.serviceFee.upsert({
-      where: { id: 'singleton' }, create: { id: 'singleton', amount: 25000 }, update: {},
-    });
 
     const DEFAULT_FEES = {
       'United Kingdom': 185000, 'United States': 220000, 'Canada': 195000, 'Australia': 210000,
@@ -634,6 +634,7 @@ async function start() {
   }
 
   const PORT = config.port;
+  require('./services/advisories').start();
   app.listen(PORT, () => {
     console.log(`\n🚀  Jekafly API running on port ${PORT}`);
     console.log(`   Environment: ${config.nodeEnv}`);

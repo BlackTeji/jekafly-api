@@ -23,7 +23,7 @@ exports.getAll = async (req, res, next) => {
     });
 
     const data = {
-      serviceFee: svcRow?.amount ?? 25000,
+      serviceFee: svcRow?.amount ?? null,
       destinations,
       enabledCountries,
       defaults: pricing.VISA_FEE_FALLBACK,
@@ -38,7 +38,7 @@ exports.getAll = async (req, res, next) => {
 // ─── PUT /fees/service ────────────────────────────────────────────────────────
 exports.setServiceFee = async (req, res, next) => {
   try {
-    const { amount } = z.object({ amount: z.number().min(0) }).parse(req.body);
+    const { amount } = z.object({ amount: z.number().int('Enter a whole naira amount').min(0).max(10000000) }).parse(req.body);
     const svc = await prisma.serviceFee.upsert({
       where: { id: 'singleton' },
       create: { id: 'singleton', amount },
