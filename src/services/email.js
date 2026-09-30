@@ -263,7 +263,7 @@ const emails = {
           ${infoRow('Package', booking.holiday?.packageName || '—')}
           ${infoRow('Destination', booking.holiday?.state || '—')}
           ${booking.occupancy ? infoRow('Room', booking.occupancy === 'SINGLE' ? 'Single occupancy' : 'Per person sharing') : ''}
-          ${infoRow('Travel Date', booking.holidayDate?.date ? new Date(booking.holidayDate.date).toDateString() : '—')}
+          ${infoRow('Travel Dates', booking.holidayDate?.date ? new Date(booking.holidayDate.date).toDateString() + (booking.holidayDate.endDate ? ' – ' + new Date(booking.holidayDate.endDate).toDateString() : '') : '—')}
           ${infoRow('Travellers', booking.travellers)}
           ${infoRow('Lead Traveller', booking.leadName || '—')}
           ${travellerRows}

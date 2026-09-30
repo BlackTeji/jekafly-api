@@ -109,7 +109,8 @@ exports.refresh = async (req, res, next) => {
 
 exports.logout = async (req, res, next) => {
   try {
-    await revokeAllRefreshTokens(req.user.id);
+    const token = req.cookies?.jkf_refresh;
+    if (token) await prisma.refreshToken.deleteMany({ where: { token, userId: req.user.id } });
     clearRefreshCookie(res);
     res.json({ ok: true, data: { message: 'Logged out successfully.' } });
   } catch (err) { next(err); }

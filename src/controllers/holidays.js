@@ -230,6 +230,7 @@ async function getAvailability(req, res) {
         const result = dates.map(d => ({
             id: d.id,
             date: d.date,
+            endDate: d.endDate,
             capacity: d.capacity,
             bookedCount: d.bookedCount,
             available: d.capacity - d.bookedCount,
@@ -387,7 +388,7 @@ async function myBookings(req, res) {
                     },
                 },
                 holidayDate: {
-                    select: { date: true },
+                    select: { date: true, endDate: true },
                 },
             },
             orderBy: { createdAt: 'desc' },
@@ -422,23 +423,62 @@ async function adminListPackages(req, res) {
     }
 }
 
+function parseDay(v) {
+    if (!v) return null;
+    const str = String(v).trim();
+    const d = /^\d{4}-\d{2}-\d{2}$/.test(str) ? new Date(str + 'T00:00:00.000Z') : new Date(str);
+    return isNaN(d.getTime()) ? undefined : d;
+}
+
+function checkSlot(input, existing) {
+    const start = input.date !== undefined ? parseDay(input.date) : existing?.date;
+    if (!start) return { error: 'Start date is required' };
+    const end = input.endDate !== undefined ? parseDay(input.endDate) : existing?.endDate ?? null;
+    if (end === undefined) return { error: 'End date is not a valid date' };
+    if (end && end < start) return { error: 'End date cannot be before the start date' };
+    let capacity = existing ? existing.capacity : 20;
+    if (input.capacity !== undefined && input.capacity !== null && input.capacity !== '') {
+        capacity = parseInt(input.capacity, 10);
+        if (!Number.isInteger(capacity) || capacity < 1 || capacity > 1000) return { error: 'Capacity must be between 1 and 1000' };
+    }
+    if (existing && capacity < existing.bookedCount) {
+        return { error: `Capacity cannot be lower than the ${existing.bookedCount} spot(s) already booked` };
+    }
+    return { data: { date: start, endDate: end, capacity } };
+}
+
 async function adminCreateDate(req, res) {
     try {
-        const { date, endDate, capacity } = req.body;
-        if (!date) return res.status(400).json({ ok: false, error: 'Date is required' });
-
         const holiday = await db.holiday.findUnique({ where: { id: req.params.holidayId } });
         if (!holiday) return res.status(404).json({ ok: false, error: 'Package not found' });
 
-        const created = await db.holidayDate.create({
-            data: {
-                holidayId: req.params.holidayId,
-                date: new Date(date),
-                endDate: endDate ? new Date(endDate) : null,
-                capacity: capacity != null ? parseInt(capacity) : 20,
-            },
-        });
-        return res.status(201).json({ ok: true, data: { date: created } });
+        const items = Array.isArray(req.body?.dates) ? req.body.dates : [req.body || {}];
+        if (!items.length) return res.status(400).json({ ok: false, error: 'Add at least one date' });
+        if (items.length > 50) return res.status(400).json({ ok: false, error: 'Add at most 50 dates at a time' });
+
+        const rows = [];
+        for (let i = 0; i < items.length; i++) {
+            const checked = checkSlot(items[i]);
+            if (checked.error) {
+                return res.status(400).json({ ok: false, error: items.length > 1 ? `Row ${i + 1}: ${checked.error}` : checked.error });
+            }
+            rows.push({ holidayId: holiday.id, ...checked.data });
+        }
+
+        const key = r => `${r.date.toISOString().slice(0, 10)}|${r.endDate ? r.endDate.toISOString().slice(0, 10) : ''}`;
+        const existing = await db.holidayDate.findMany({ where: { holidayId: holiday.id }, select: { date: true, endDate: true } });
+        const seen = new Set(existing.map(key));
+        for (let i = 0; i < rows.length; i++) {
+            const k = key(rows[i]);
+            if (seen.has(k)) {
+                const label = rows[i].date.toISOString().slice(0, 10) + (rows[i].endDate ? ' to ' + rows[i].endDate.toISOString().slice(0, 10) : '');
+                return res.status(400).json({ ok: false, error: `${items.length > 1 ? `Row ${i + 1}: ` : ''}${label} is already a trip date for this package` });
+            }
+            seen.add(k);
+        }
+
+        const created = await db.$transaction(rows.map(data => db.holidayDate.create({ data })));
+        return res.status(201).json({ ok: true, data: { date: created[0], dates: created } });
     } catch (err) {
         console.error('adminCreateDate error:', err);
         return res.status(500).json({ ok: false, error: 'Failed to create date' });
@@ -447,15 +487,11 @@ async function adminCreateDate(req, res) {
 
 async function adminUpdateDate(req, res) {
     try {
-        const { date, endDate, capacity } = req.body;
-        const updated = await db.holidayDate.update({
-            where: { id: req.params.dateId },
-            data: {
-                ...(date && { date: new Date(date) }),
-                ...(endDate !== undefined && { endDate: endDate ? new Date(endDate) : null }),
-                ...(capacity != null && { capacity: parseInt(capacity) }),
-            },
-        });
+        const existing = await db.holidayDate.findUnique({ where: { id: req.params.dateId } });
+        if (!existing) return res.status(404).json({ ok: false, error: 'Date not found' });
+        const checked = checkSlot(req.body || {}, existing);
+        if (checked.error) return res.status(400).json({ ok: false, error: checked.error });
+        const updated = await db.holidayDate.update({ where: { id: existing.id }, data: checked.data });
         return res.json({ ok: true, data: { date: updated } });
     } catch (err) {
         console.error('adminUpdateDate error:', err);

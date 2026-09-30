@@ -18,14 +18,23 @@ const saveRefreshToken = async (userId, token) => {
   await prisma.refreshToken.create({ data: { token, userId, expiresAt } });
 };
 
+const ROTATION_GRACE_MS = 60 * 1000;
+
 const rotateRefreshToken = async (oldToken) => {
   const existing = await prisma.refreshToken.findUnique({ where: { token: oldToken } });
-  if (!existing || existing.expiresAt < new Date()) return null;
+  const now = new Date();
+  if (!existing || existing.expiresAt < now) return null;
 
-  // Delete old, issue new
-  await prisma.refreshToken.delete({ where: { token: oldToken } });
+  // Keep the old token valid for a short grace window instead of deleting it,
+  // so parallel refreshes (several tabs, or several requests on one page) all succeed.
+  const graceEnd = new Date(now.getTime() + ROTATION_GRACE_MS);
+  if (existing.expiresAt > graceEnd) {
+    await prisma.refreshToken.updateMany({ where: { token: oldToken }, data: { expiresAt: graceEnd } });
+  }
+
   const newToken = generateRefreshToken();
   await saveRefreshToken(existing.userId, newToken);
+  await prisma.refreshToken.deleteMany({ where: { userId: existing.userId, expiresAt: { lt: now } } }).catch(() => { });
 
   return { userId: existing.userId, newRefreshToken: newToken };
 };
