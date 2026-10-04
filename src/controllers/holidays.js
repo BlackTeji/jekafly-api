@@ -163,6 +163,8 @@ async function listHolidays(req, res) {
                 ...publicHoliday(h),
                 hasAvailability: openDates.length > 0,
                 nextDate: openDates.length ? openDates[0].date : null,
+                openDateCount: openDates.length,
+                upcomingDateCount: h.dates.length,
                 dates: openDates.slice(0, 3),
             };
         });
