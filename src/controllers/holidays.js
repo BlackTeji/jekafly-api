@@ -162,20 +162,30 @@ async function listHolidays(req, res) {
             return {
                 ...publicHoliday(h),
                 hasAvailability: openDates.length > 0,
+                nextDate: openDates.length ? openDates[0].date : null,
                 dates: openDates.slice(0, 3),
             };
         });
 
+        // Packages with open dates first, soonest departure leading; the rest keep their admin order.
+        const nextTime = h => (h.nextDate ? new Date(h.nextDate).getTime() : Infinity);
         const grouped = {};
         for (const h of withAvailability) {
             if (!grouped[h.region]) grouped[h.region] = [];
             grouped[h.region].push(h);
+        }
+        for (const r of Object.keys(grouped)) {
+            grouped[r] = grouped[r]
+                .map((h, i) => ({ h, i }))
+                .sort((a, b) => (nextTime(a.h) - nextTime(b.h)) || (a.i - b.i))
+                .map(x => x.h);
         }
 
         const extra = Object.keys(grouped).filter(r => !REGION_ORDER.includes(r)).sort();
         const ordered = [...REGION_ORDER.filter(r => grouped[r]), ...extra].map(r => ({
             region: r,
             category: grouped[r][0].category,
+            nextDate: grouped[r][0].nextDate,
             packages: grouped[r],
         }));
 
